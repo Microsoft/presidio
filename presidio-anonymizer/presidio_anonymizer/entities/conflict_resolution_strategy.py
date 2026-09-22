@@ -15,8 +15,13 @@ class ConflictResolutionStrategy(Enum):
     the lower-scored one is trimmed to the part outside the higher-scored one
     (on equal scores, the one that starts first keeps the overlap). Results
     trimmed to nothing are dropped.
+    KEEP_CONTAINED_WITH_HIGHER_SCORE: Keeps an entity contained in another one
+    when its score is higher than the score of the containing entity, and then
+    removes the intersections. The other strategies always drop the contained
+    entity, whatever its score.
     NONE: No conflict resolution will be performed.
     """
 
     MERGE_SIMILAR_OR_CONTAINED = "merge_similar_or_contained"
     REMOVE_INTERSECTIONS = "remove_intersections"
+    KEEP_CONTAINED_WITH_HIGHER_SCORE = "keep_contained_with_higher_score"

@@ -141,8 +141,15 @@ class AnonymizerEngine(EngineBase):
         Only insert results which are:
         1. Indices are not contained in other result.
         2. Have the same indices as other results but with larger score.
+        Under the KEEP_CONTAINED_WITH_HIGHER_SCORE strategy a contained result
+        is also inserted when its score is higher than the containing one's.
         :return: List
         """
+        keep_contained_with_higher_score = (
+            conflict_resolution
+            == ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE
+        )
+
         tmp_analyzer_results = []
         # This list contains all elements which we need to check a single result
         # against. If a result is dropped, it can also be dropped from this list
@@ -179,7 +186,7 @@ class AnonymizerEngine(EngineBase):
         for result in tmp_analyzer_results:
             other_elements.remove(result)
             result_conflicted = self.__is_result_conflicted_with_other_elements(
-                other_elements, result
+                other_elements, result, keep_contained_with_higher_score
             )
             if not result_conflicted:
                 other_elements.append(result)
@@ -193,7 +200,10 @@ class AnonymizerEngine(EngineBase):
         # various entities overlapping. This will not drop the results insted
         # it adjust the start and end positions of overlapping results and removes
         # All types of conflicts among entities as well as text.
-        if conflict_resolution == ConflictResolutionStrategy.REMOVE_INTERSECTIONS:
+        if conflict_resolution in (
+            ConflictResolutionStrategy.REMOVE_INTERSECTIONS,
+            ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE,
+        ):
             # Sort by end as well, so after a trim the shorter of two results that
             # now share a start is resolved against the longer one, not skipped.
             unique_text_metadata_elements.sort(
@@ -243,9 +253,14 @@ class AnonymizerEngine(EngineBase):
         return names
 
     @staticmethod
-    def __is_result_conflicted_with_other_elements(other_elements, result):
+    def __is_result_conflicted_with_other_elements(
+        other_elements, result, keep_contained_with_higher_score
+    ):
         return any(
-            [result.has_conflict(other_element) for other_element in other_elements]
+            [
+                result.has_conflict(other_element, keep_contained_with_higher_score)
+                for other_element in other_elements
+            ]
         )
 
     @staticmethod

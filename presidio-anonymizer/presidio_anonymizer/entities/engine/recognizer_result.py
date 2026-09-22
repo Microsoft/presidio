@@ -90,7 +90,7 @@ class RecognizerResult(PIIEntity):
             f"score: {self.score}"
         )
 
-    def has_conflict(self, other):
+    def has_conflict(self, other, keep_contained_with_higher_score: bool = False):
         """
         Check if two recognizer results are conflicted or not.
 
@@ -99,10 +99,15 @@ class RecognizerResult(PIIEntity):
         2. If my indices are contained in another.
 
         :param other: RecognizerResult
+        :param keep_contained_with_higher_score: if True, being contained in
+        another result is a conflict only when my score is not higher than the
+        other result's score.
         :return:
         """
         if self.equal_indices(other):
             return self.score <= other.score
+        if keep_contained_with_higher_score:
+            return other.contains(self) and self.score <= other.score
         return other.contains(self)
 
     def contains(self, other):

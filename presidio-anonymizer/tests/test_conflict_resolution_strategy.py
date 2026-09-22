@@ -200,3 +200,106 @@ def test_when_remove_intersections_conflict_selected_then_all_conflicts_handled(
 
     assert result.text == expected_result.text
     assert sorted(result.items) == sorted(expected_result.items)
+
+
+@pytest.mark.parametrize(
+    # fmt: off
+    "conflict_strategy, expected_result",
+    [
+        (
+            ConflictResolutionStrategy.MERGE_SIMILAR_OR_CONTAINED,
+            "Name: <ENTITY1> Word3"
+        ),
+        (
+            ConflictResolutionStrategy.REMOVE_INTERSECTIONS,
+            "Name: <ENTITY1> Word3"
+        ),
+        (
+            ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE,
+            "Name: <ENTITY2><ENTITY1> Word3"
+        ),
+    ]
+    # fmt: on
+)
+def test_when_contained_entity_scores_higher_then_only_new_strategy_keeps_it(
+    conflict_strategy, expected_result
+):
+    engine = AnonymizerEngine()
+    analyzer_results = [
+        RecognizerResult("ENTITY1", 6, 17, 0.1),
+        RecognizerResult("ENTITY2", 6, 11, 1),
+    ]
+    result = engine.anonymize(
+        "Name: Word1 Word2 Word3",
+        analyzer_results,
+        conflict_resolution=conflict_strategy
+    ).text
+
+    assert result == expected_result
+
+
+@pytest.mark.parametrize(
+    # fmt: off
+    "analyzer_results, expected_result",
+    [
+        # The contained entity scores higher, so it is kept and the containing
+        # entity is trimmed down to the text it does not share.
+        (
+            [
+                RecognizerResult("ENTITY1", 6, 17, 0.1),
+                RecognizerResult("ENTITY2", 6, 11, 1)
+            ],
+            EngineResult(
+                text="Name: Word1 Word2 Word3",
+                items=[
+                    OperatorResult(6, 11, 'ENTITY2', 'Word1', 'keep'),
+                    OperatorResult(11, 17, 'ENTITY1', ' Word2', 'keep')
+                ]
+            )
+        ),
+        # The contained entity scores lower, so it is dropped as it is by the
+        # other strategies.
+        (
+            [
+                RecognizerResult("ENTITY1", 6, 17, 1),
+                RecognizerResult("ENTITY2", 6, 11, 0.1)
+            ],
+            EngineResult(
+                text="Name: Word1 Word2 Word3",
+                items=[
+                    OperatorResult(6, 17, 'ENTITY1', 'Word1 Word2', 'keep')
+                ]
+            )
+        ),
+        # Equal indices are resolved by score, as in the other strategies.
+        (
+            [
+                RecognizerResult("ENTITY1", 6, 11, 0.1),
+                RecognizerResult("ENTITY2", 6, 11, 1)
+            ],
+            EngineResult(
+                text="Name: Word1 Word2 Word3",
+                items=[
+                    OperatorResult(6, 11, 'ENTITY2', 'Word1', 'keep')
+                ]
+            )
+        ),
+    ]
+    # fmt: on
+)
+def test_when_keep_contained_with_higher_score_selected_then_spans_do_not_overlap(
+    analyzer_results, expected_result
+):
+    engine = AnonymizerEngine()
+    operator_config = OperatorConfig("keep")
+    result = engine.anonymize(
+        "Name: Word1 Word2 Word3",
+        analyzer_results,
+        {"DEFAULT": operator_config},
+        conflict_resolution=(
+            ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE
+        )
+    )
+
+    assert result.text == expected_result.text
+    assert sorted(result.items) == sorted(expected_result.items)
