@@ -303,3 +303,139 @@ def test_when_keep_contained_with_higher_score_selected_then_spans_do_not_overla
 
     assert result.text == expected_result.text
     assert sorted(result.items) == sorted(expected_result.items)
+
+
+@pytest.mark.parametrize(
+    # fmt: off
+    "analyzer_results, expected_result",
+    [
+        # The contained entity shares neither boundary, so the containing entity
+        # is split in two and the text on both sides of it stays anonymized.
+        (
+            [
+                RecognizerResult("ENTITY1", 6, 23, 0.1),
+                RecognizerResult("ENTITY2", 12, 17, 1)
+            ],
+            EngineResult(
+                text="Name: Word1 Word2 Word3",
+                items=[
+                    OperatorResult(6, 12, 'ENTITY1', 'Word1 ', 'keep'),
+                    OperatorResult(12, 17, 'ENTITY2', 'Word2', 'keep'),
+                    OperatorResult(17, 23, 'ENTITY1', ' Word3', 'keep')
+                ]
+            )
+        ),
+        # Nested containment: every entity keeps the text no higher scored entity
+        # covers, so the two parts of the middle entity survive as well.
+        (
+            [
+                RecognizerResult("ENTITY1", 6, 23, 0.1),
+                RecognizerResult("ENTITY2", 11, 18, 0.5),
+                RecognizerResult("ENTITY3", 12, 17, 0.9)
+            ],
+            EngineResult(
+                text="Name: Word1 Word2 Word3",
+                items=[
+                    OperatorResult(6, 11, 'ENTITY1', 'Word1', 'keep'),
+                    OperatorResult(11, 12, 'ENTITY2', ' ', 'keep'),
+                    OperatorResult(12, 17, 'ENTITY3', 'Word2', 'keep'),
+                    OperatorResult(17, 18, 'ENTITY2', ' ', 'keep'),
+                    OperatorResult(18, 23, 'ENTITY1', 'Word3', 'keep')
+                ]
+            )
+        ),
+        # Nested containment sharing a start, where trimming one boundary would
+        # leave an entity covering no text at all.
+        (
+            [
+                RecognizerResult("ENTITY1", 6, 23, 0.1),
+                RecognizerResult("ENTITY2", 6, 17, 0.5),
+                RecognizerResult("ENTITY3", 6, 11, 0.9)
+            ],
+            EngineResult(
+                text="Name: Word1 Word2 Word3",
+                items=[
+                    OperatorResult(6, 11, 'ENTITY3', 'Word1', 'keep'),
+                    OperatorResult(11, 17, 'ENTITY2', ' Word2', 'keep'),
+                    OperatorResult(17, 23, 'ENTITY1', ' Word3', 'keep')
+                ]
+            )
+        ),
+    ]
+    # fmt: on
+)
+def test_when_contained_entity_is_kept_then_containing_entity_is_split(
+    analyzer_results, expected_result
+):
+    engine = AnonymizerEngine()
+    operator_config = OperatorConfig("keep")
+    result = engine.anonymize(
+        "Name: Word1 Word2 Word3",
+        analyzer_results,
+        {"DEFAULT": operator_config},
+        conflict_resolution=(
+            ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE
+        )
+    )
+
+    assert result.text == expected_result.text
+    assert sorted(result.items) == sorted(expected_result.items)
+
+
+@pytest.mark.parametrize(
+    # fmt: off
+    "analyzer_results",
+    [
+        # Contained entity sharing the start of the containing one.
+        [
+            RecognizerResult("ENTITY1", 6, 17, 0.1),
+            RecognizerResult("ENTITY2", 6, 11, 1)
+        ],
+        # Contained entity sharing the end of the containing one.
+        [
+            RecognizerResult("ENTITY1", 6, 17, 0.1),
+            RecognizerResult("ENTITY2", 12, 17, 1)
+        ],
+        # Contained entity sharing neither boundary.
+        [
+            RecognizerResult("ENTITY1", 6, 23, 0.1),
+            RecognizerResult("ENTITY2", 12, 17, 1)
+        ],
+        # Nested containment.
+        [
+            RecognizerResult("ENTITY1", 6, 23, 0.1),
+            RecognizerResult("ENTITY2", 11, 18, 0.5),
+            RecognizerResult("ENTITY3", 12, 17, 0.9)
+        ],
+        # Containment and partial intersection together.
+        [
+            RecognizerResult("ENTITY1", 6, 17, 0.1),
+            RecognizerResult("ENTITY2", 12, 15, 1),
+            RecognizerResult("ENTITY3", 14, 23, 0.5)
+        ],
+    ]
+    # fmt: on
+)
+def test_when_keep_contained_with_higher_score_selected_then_flagged_text_is_covered(
+    analyzer_results
+):
+    engine = AnonymizerEngine()
+    operator_config = OperatorConfig("keep")
+    result = engine.anonymize(
+        "Name: Word1 Word2 Word3",
+        analyzer_results,
+        {"DEFAULT": operator_config},
+        conflict_resolution=(
+            ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE
+        )
+    )
+
+    flagged_indices = set()
+    for analyzer_result in analyzer_results:
+        flagged_indices.update(range(analyzer_result.start, analyzer_result.end))
+    anonymized_indices = set()
+    for item in result.items:
+        anonymized_indices.update(range(item.start, item.end))
+
+    assert anonymized_indices == flagged_indices
+    assert all(item.start < item.end for item in result.items)
