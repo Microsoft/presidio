@@ -196,14 +196,22 @@ class AnonymizerEngine(EngineBase):
                     f"removing element {result} from results list due to conflict"
                 )
 
+        # A result kept because it scores higher than the result containing it
+        # still overlaps that result, and the intersection removal below can only
+        # move one of a result's two boundaries, so it would drop the text after
+        # the contained result instead of anonymizing it. Cutting the shared text
+        # out of the lower scored result handles that, and every other overlap,
+        # without ever losing a character the analyzer flagged.
+        if keep_contained_with_higher_score:
+            unique_text_metadata_elements = self.__resolve_overlaps_by_score(
+                unique_text_metadata_elements
+            )
+
         # This further improves the quality of handling the conflict between the
         # various entities overlapping. This will not drop the results insted
         # it adjust the start and end positions of overlapping results and removes
         # All types of conflicts among entities as well as text.
-        if conflict_resolution in (
-            ConflictResolutionStrategy.REMOVE_INTERSECTIONS,
-            ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE,
-        ):
+        elif conflict_resolution == ConflictResolutionStrategy.REMOVE_INTERSECTIONS:
             # Sort by end as well, so after a trim the shorter of two results that
             # now share a start is resolved against the longer one, not skipped.
             unique_text_metadata_elements.sort(
@@ -251,6 +259,56 @@ class AnonymizerEngine(EngineBase):
         """Return a list of supported anonymizers."""
         names = [p for p in self.operators_factory.get_anonymizers().keys()]
         return names
+
+    @staticmethod
+    def __resolve_overlaps_by_score(
+        elements: List[RecognizerResult],
+    ) -> List[RecognizerResult]:
+        """
+        Give every character to the highest scored result covering it.
+
+        A result sharing text with a higher scored one becomes one result per part
+        it does not share, and disappears when higher scored results cover all of
+        it. The returned results therefore never overlap, never cover no text at
+        all, and together still cover exactly the text the given results cover.
+
+        :param elements: results which may overlap one another
+        :return: results which do not overlap one another
+        """
+        elements_by_score = sorted(
+            elements, key=lambda element: (-element.score, element.start, -element.end)
+        )
+        resolved_elements = []
+        stronger_elements = []
+        for element in elements_by_score:
+            start = element.start
+            for stronger_element in sorted(
+                stronger_elements, key=lambda other: other.start
+            ):
+                if (
+                    stronger_element.end <= start
+                    or stronger_element.start >= element.end
+                ):
+                    continue
+                if stronger_element.start > start:
+                    resolved_elements.append(
+                        RecognizerResult(
+                            element.entity_type,
+                            start,
+                            stronger_element.start,
+                            element.score,
+                        )
+                    )
+                start = stronger_element.end
+            if start < element.end:
+                resolved_elements.append(
+                    RecognizerResult(
+                        element.entity_type, start, element.end, element.score
+                    )
+                )
+            stronger_elements.append(element)
+        resolved_elements.sort(key=lambda element: element.start)
+        return resolved_elements
 
     @staticmethod
     def __is_result_conflicted_with_other_elements(
