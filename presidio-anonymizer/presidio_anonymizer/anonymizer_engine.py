@@ -141,8 +141,15 @@ class AnonymizerEngine(EngineBase):
         Only insert results which are:
         1. Indices are not contained in other result.
         2. Have the same indices as other results but with larger score.
+        Under the KEEP_CONTAINED_WITH_HIGHER_SCORE strategy a contained result
+        is also inserted when its score is higher than the containing one's.
         :return: List
         """
+        keep_contained_with_higher_score = (
+            conflict_resolution
+            == ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE
+        )
+
         tmp_analyzer_results = []
         # This list contains all elements which we need to check a single result
         # against. If a result is dropped, it can also be dropped from this list
@@ -179,7 +186,7 @@ class AnonymizerEngine(EngineBase):
         for result in tmp_analyzer_results:
             other_elements.remove(result)
             result_conflicted = self.__is_result_conflicted_with_other_elements(
-                other_elements, result
+                other_elements, result, keep_contained_with_higher_score
             )
             if not result_conflicted:
                 other_elements.append(result)
@@ -189,11 +196,22 @@ class AnonymizerEngine(EngineBase):
                     f"removing element {result} from results list due to conflict"
                 )
 
+        # A result kept because it scores higher than the result containing it
+        # still overlaps that result, and the intersection removal below can only
+        # move one of a result's two boundaries, so it would drop the text after
+        # the contained result instead of anonymizing it. Cutting the shared text
+        # out of the lower scored result handles that, and every other overlap,
+        # without ever losing a character the analyzer flagged.
+        if keep_contained_with_higher_score:
+            unique_text_metadata_elements = self.__resolve_overlaps_by_score(
+                unique_text_metadata_elements
+            )
+
         # This further improves the quality of handling the conflict between the
         # various entities overlapping. This will not drop the results insted
         # it adjust the start and end positions of overlapping results and removes
         # All types of conflicts among entities as well as text.
-        if conflict_resolution == ConflictResolutionStrategy.REMOVE_INTERSECTIONS:
+        elif conflict_resolution == ConflictResolutionStrategy.REMOVE_INTERSECTIONS:
             # Sort by end as well, so after a trim the shorter of two results that
             # now share a start is resolved against the longer one, not skipped.
             unique_text_metadata_elements.sort(
@@ -243,9 +261,64 @@ class AnonymizerEngine(EngineBase):
         return names
 
     @staticmethod
-    def __is_result_conflicted_with_other_elements(other_elements, result):
+    def __resolve_overlaps_by_score(
+        elements: List[RecognizerResult],
+    ) -> List[RecognizerResult]:
+        """
+        Give every character to the highest scored result covering it.
+
+        A result sharing text with a higher scored one becomes one result per part
+        it does not share, and disappears when higher scored results cover all of
+        it. The returned results therefore never overlap, never cover no text at
+        all, and together still cover exactly the text the given results cover.
+
+        :param elements: results which may overlap one another
+        :return: results which do not overlap one another
+        """
+        elements_by_score = sorted(
+            elements, key=lambda element: (-element.score, element.start, -element.end)
+        )
+        resolved_elements = []
+        stronger_elements = []
+        for element in elements_by_score:
+            start = element.start
+            for stronger_element in sorted(
+                stronger_elements, key=lambda other: other.start
+            ):
+                if (
+                    stronger_element.end <= start
+                    or stronger_element.start >= element.end
+                ):
+                    continue
+                if stronger_element.start > start:
+                    resolved_elements.append(
+                        RecognizerResult(
+                            element.entity_type,
+                            start,
+                            stronger_element.start,
+                            element.score,
+                        )
+                    )
+                start = stronger_element.end
+            if start < element.end:
+                resolved_elements.append(
+                    RecognizerResult(
+                        element.entity_type, start, element.end, element.score
+                    )
+                )
+            stronger_elements.append(element)
+        resolved_elements.sort(key=lambda element: element.start)
+        return resolved_elements
+
+    @staticmethod
+    def __is_result_conflicted_with_other_elements(
+        other_elements, result, keep_contained_with_higher_score
+    ):
         return any(
-            [result.has_conflict(other_element) for other_element in other_elements]
+            [
+                result.has_conflict(other_element, keep_contained_with_higher_score)
+                for other_element in other_elements
+            ]
         )
 
     @staticmethod

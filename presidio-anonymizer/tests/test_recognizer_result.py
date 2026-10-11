@@ -177,6 +177,46 @@ def test_given_recognizer_results_with_no_conflicting_indices_then_there_is_no_c
 
 @pytest.mark.parametrize(
     # fmt: off
+    "score, expected_conflict",
+    [
+        (0.1, True),
+        (0.2, True),
+        (0.3, False),
+    ],
+    # fmt: on
+)
+def test_given_contained_result_then_conflict_depends_on_score(
+    score, expected_conflict
+):
+    contained = create_recognizer_result("bla", score, 2, 10)
+    containing = create_recognizer_result("changed", 0.2, 0, 12)
+
+    assert contained.has_conflict(containing, True) == expected_conflict
+    # The default keeps dropping the contained result whatever its score.
+    assert contained.has_conflict(containing)
+
+
+@pytest.mark.parametrize(
+    # fmt: off
+    "entity_type, score, start, end",
+    [
+        ("bla", 0.2, 0, 10),
+        ("changed", 0.2, 2, 10),
+        ("bla", 0.3, 0, 11),
+    ],
+    # fmt: on
+)
+def test_given_equal_or_higher_scored_container_then_there_is_still_a_conflict(
+    entity_type, score, start, end
+):
+    first = create_recognizer_result("bla", 0.2, 2, 10)
+    second = create_recognizer_result(entity_type, score, start, end)
+
+    assert first.has_conflict(second, True)
+
+
+@pytest.mark.parametrize(
+    # fmt: off
     "request_json, result_text",
     [
         ({}, "Invalid input, result must contain start",),

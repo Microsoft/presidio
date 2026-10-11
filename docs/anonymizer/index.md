@@ -318,6 +318,7 @@ anonymization scenarios:
     the PII with the higher score will be taken.
     Between PIIs with identical scores, the selection is arbitrary.
 - **One PII is contained in another**: Presidio Anonymizer will use the PII with the larger text even if it's score is lower.
+    See [conflict resolution strategies](#conflict-resolution-strategies) to keep the contained PII when it has the higher score.
 - **Partial intersection**: Presidio Anonymizer will anonymize each individually and will return a concatenation of the anonymized text.
     For example:
     For the text
@@ -333,6 +334,59 @@ anonymization scenarios:
     ```
     I'm <PERSON><LOCATION>.
     ```
+
+### Conflict resolution strategies
+
+The `conflict_resolution` parameter of `AnonymizerEngine.anonymize` selects how
+overlaps are resolved:
+
+- `ConflictResolutionStrategy.MERGE_SIMILAR_OR_CONTAINED` (default): applies the
+    scenarios described above.
+- `ConflictResolutionStrategy.REMOVE_INTERSECTIONS`: additionally trims partially
+    intersecting entities, so that the returned spans never overlap.
+- `ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE`: gives every
+    character to the highest scoring entity covering it. An entity contained in a
+    lower scoring one is therefore kept, and the containing entity is split into
+    the parts it does not share, so that none of the text the analyzer flagged is
+    left unanonymized. The two other strategies drop the contained entity whatever
+    its score.
+
+```python
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import ConflictResolutionStrategy, RecognizerResult
+
+engine = AnonymizerEngine()
+result = engine.anonymize(
+    text="Name: Word1 Word2 Word3",
+    analyzer_results=[
+        RecognizerResult("ENTITY1", start=6, end=17, score=0.1),
+        RecognizerResult("ENTITY2", start=6, end=11, score=1.0),
+    ],
+    conflict_resolution=ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE,
+)
+
+print(result.text)
+# Name: <ENTITY2><ENTITY1> Word3
+# With the other strategies: Name: <ENTITY1> Word3
+```
+
+When the contained entity sits in the middle of the containing one, the containing
+entity is anonymized on both sides of it:
+
+```python
+result = engine.anonymize(
+    text="Send it to 1234 Elm Street, Springfield, IL 62704",
+    analyzer_results=[
+        RecognizerResult("ADDRESS", start=11, end=49, score=0.4),
+        RecognizerResult("LOCATION", start=28, end=39, score=0.85),
+    ],
+    conflict_resolution=ConflictResolutionStrategy.KEEP_CONTAINED_WITH_HIGHER_SCORE,
+)
+
+print(result.text)
+# Send it to <ADDRESS><LOCATION><ADDRESS>
+# With the other strategies: Send it to <ADDRESS>
+```
 
 ### Additional examples for overlapping PII scenarios
 
