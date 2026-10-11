@@ -194,7 +194,11 @@ class AnonymizerEngine(EngineBase):
         # it adjust the start and end positions of overlapping results and removes
         # All types of conflicts among entities as well as text.
         if conflict_resolution == ConflictResolutionStrategy.REMOVE_INTERSECTIONS:
-            unique_text_metadata_elements.sort(key=lambda element: element.start)
+            # Sort by end as well, so after a trim the shorter of two results that
+            # now share a start is resolved against the longer one, not skipped.
+            unique_text_metadata_elements.sort(
+                key=lambda element: (element.start, element.end)
+            )
             elements_length = len(unique_text_metadata_elements)
             index = 0
             while index < elements_length - 1:
@@ -208,12 +212,12 @@ class AnonymizerEngine(EngineBase):
                     else:
                         current_entity.end = next_entity.start
                     unique_text_metadata_elements.sort(
-                        key=lambda element: element.start
+                        key=lambda element: (element.start, element.end)
                     )
             unique_text_metadata_elements = [
                 element
                 for element in unique_text_metadata_elements
-                if element.start <= element.end
+                if element.start < element.end
             ]
         return unique_text_metadata_elements
 
