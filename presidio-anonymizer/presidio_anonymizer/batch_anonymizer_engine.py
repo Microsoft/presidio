@@ -34,6 +34,14 @@ class BatchAnonymizerEngine:
         return_list = []
         if not recognizer_results_list:
             recognizer_results_list = [[] for _ in range(len(texts))]
+        elif len(texts) != len(recognizer_results_list):
+            raise ValueError(
+                "The number of recognizer-result lists must match "
+                "the number of input texts. "
+                f"Received {len(texts)} texts and "
+                f"{len(recognizer_results_list)} result lists."
+            )
+
         for text, recognizer_results in zip(texts, recognizer_results_list):
             if type(text) in (str, bool, int, float):
                 res = self.anonymizer_engine.anonymize(
