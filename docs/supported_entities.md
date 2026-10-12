@@ -192,6 +192,12 @@ For more information, refer to the [adding new recognizers documentation](analyz
 | DE_HANDELSREGISTER | German Handelsregisternummer: commercial register number with HRA (sole traders / partnerships) or HRB (corporations) prefix followed by 1–6 digits. HRA entries directly identify natural persons (sole traders). Legal basis: §§ 9, 14 HGB, HRV. | Pattern match and context |
 | DE_PLZ | German Postleitzahl (postal code): 5-digit code in the range 01001–99998. Constitutes personal data in combination with other address fields (DSGVO Art. 4 Nr. 1). **High false-positive risk** – only reliable with address-context words present; base confidence is 0.05. Legal basis: DSGVO Art. 4 Nr. 1. | Pattern match and context (context required for actionable results) |
 
+### France
+
+| Entity Type | Description | Detection Method |
+| --- | --- | --- |
+| FR_NIR | French NIR (numéro de sécurité sociale): the 15-character social security number assigned by INSEE, encoding sex, year and month of birth, département and commune of birth, an order number and a 2-digit key. Corsican départements 2A/2B and overseas départements are supported. Only the form with the key is detected. | Pattern match, context and key (97 - N mod 97) |
+
 ### Medical / Clinical
 
 Detected using the `MedicalNERRecognizer` (requires the `transformers` extra). Uses the [blaze999/Medical-NER](https://huggingface.co/blaze999/Medical-NER) model by default.

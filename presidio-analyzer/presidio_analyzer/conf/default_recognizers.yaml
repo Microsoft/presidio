@@ -647,3 +647,11 @@ recognizers:
     type: predefined
     enabled: false
     country_code: ca
+
+  # France recognizers (disabled by default, enable for French-language pipelines)
+  - name: FrNirRecognizer
+    supported_languages:
+    - fr
+    type: predefined
+    enabled: false
+    country_code: fr
