@@ -4,7 +4,7 @@ requires = ["poetry-core"]
 
 [project]
 name = "presidio_analyzer"
-version = "2.2.363"
+version = "2.2.364"
 description = "Presidio Analyzer package"
 authors = [{name = "Presidio", email = "presidio@dataprivacystack.org"}]
 license = "MIT"

@@ -1,7 +1,7 @@
 """Factory provider for creating text chunkers from configuration."""
 
 import logging
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional
 
 from presidio_analyzer.chunkers.base_chunker import BaseTextChunker
 from presidio_analyzer.chunkers.character_based_text_chunker import (
@@ -9,11 +9,6 @@ from presidio_analyzer.chunkers.character_based_text_chunker import (
 )
 
 logger = logging.getLogger("presidio-analyzer")
-
-# Registry mapping chunker type names to classes
-_CHUNKER_REGISTRY: Dict[str, Type[BaseTextChunker]] = {
-    "character": CharacterBasedTextChunker,
-}
 
 
 class TextChunkerProvider:
@@ -44,17 +39,23 @@ class TextChunkerProvider:
         config = self.chunker_configuration.copy()
         chunker_type = config.pop("chunker_type", "character")
 
-        if chunker_type not in _CHUNKER_REGISTRY:
-            raise ValueError(
-                f"Unknown chunker_type '{chunker_type}'. "
-                f"Available: {list(_CHUNKER_REGISTRY.keys())}"
+        if chunker_type == "character":
+            chunker_class = CharacterBasedTextChunker
+        elif chunker_type == "tokenizer":
+            from presidio_analyzer.chunkers.tokenizer_based_text_chunker import (
+                TokenizerBasedTextChunker,
             )
 
-        chunker_class = _CHUNKER_REGISTRY[chunker_type]
+            chunker_class = TokenizerBasedTextChunker
+        else:
+            raise ValueError(
+                f"Unknown chunker_type '{chunker_type}'. "
+                f"Available: ['character', 'tokenizer']"
+            )
+
         try:
             return chunker_class(**config)
         except TypeError as exc:
             raise ValueError(
                 f"Invalid configuration for chunker_type '{chunker_type}': {config}"
             ) from exc
-

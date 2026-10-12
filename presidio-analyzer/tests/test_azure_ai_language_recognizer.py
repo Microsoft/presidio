@@ -87,3 +87,39 @@ def test_mocked_entities_match_recognizer_results():
         assert expected.offset == actual.start
         assert expected.length == actual.end - actual.start
         assert expected.confidence_score == actual.score
+
+
+def _mock_ta_client():
+    try:
+        importlib.import_module("azure.ai.textanalytics")
+    except ImportError:
+        pytest.skip("Skipping test because 'azure.ai.textanalytics' is not installed")
+
+    from azure.ai.textanalytics import TextAnalyticsClient
+    from azure.core.credentials import AzureKeyCredential
+
+    return TextAnalyticsClient(endpoint="", credential=AzureKeyCredential(key=""))
+
+
+def test_name_defaults_to_the_display_name():
+    recognizer = AzureAILanguageRecognizer(ta_client=_mock_ta_client())
+    assert recognizer.name == "Azure AI Language PII"
+
+
+def test_name_can_be_overridden():
+    # RecognizerListLoader passes `name` for every entry it builds, so the
+    # constructor has to accept it; a `class_name` entry relies on it winning
+    # over the hardcoded display name.
+    recognizer = AzureAILanguageRecognizer(
+        ta_client=_mock_ta_client(), name="Custom Azure PII"
+    )
+    assert recognizer.name == "Custom Azure PII"
+
+
+def test_context_is_accepted():
+    # The kwarg #1457 originally failed on. RemoteRecognizer takes it, so the
+    # subclass has to forward it rather than reject it.
+    recognizer = AzureAILanguageRecognizer(
+        ta_client=_mock_ta_client(), context=["patient", "record"]
+    )
+    assert recognizer.context == ["patient", "record"]

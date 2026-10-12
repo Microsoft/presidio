@@ -25,6 +25,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |PHONE_NUMBER|A telephone number. The `PhoneRecognizer` can be extended programmatically for country-specific detection by configuring `supported_regions` and `supported_entity` (e.g. Philippines: `PhoneRecognizer(supported_regions=["PH"], supported_entity="PH_MOBILE_NUMBER")`, Turkey: `PhoneRecognizer(supported_regions=["TR"], supported_entity="TR_PHONE_NUMBER")`)|Custom logic, pattern match and context|
 |MEDICAL_LICENSE|Common medical license numbers.|Pattern match, context and checksum|
 |URL|A URL (Uniform Resource Locator), unique identifier used to locate a resource on the Internet|Pattern match, context and top level url validation|
+|UUID|A Universally Unique Identifier (UUID) in the standard 8-4-4-4-12 hyphenated hexadecimal format. Covers RFC 4122 versions 1-5 and RFC 9562 versions 6-8; the nil UUID (all zeros) is excluded as a non-identifying sentinel.|Pattern match, validation of version/variant nibbles, and context|
 
 ### USA
 
@@ -33,9 +34,15 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |US_BANK_NUMBER|A US bank account number is between 8 to 17 digits.|Pattern match and context|
 |US_DRIVER_LICENSE|A US driver license according to <https://ntsi.com/drivers-license-format/>|Pattern match and context|
 |US_ITIN | US Individual Taxpayer Identification Number (ITIN). Nine digits that start with a "9" and contain a "7" or "8" as the 4 digit.|Pattern match and context|
+|US_CLAIM_NUMBER|A US healthcare claim identifier used in billing and claims processing.|Pattern match, context enhancement, and entity threshold|
+|US_HEALTH_INSURANCE_MEMBER_ID|A US health insurance member or subscriber identifier printed on an insurance card. Healthcare or insurance context increases detection confidence.|Pattern match, context enhancement, and entity threshold|
 |US_MBI|A US Medicare Beneficiary Identifier (MBI) with 11 alphanumeric characters.|Pattern match and context|
 |US_NPI|A US National Provider Identifier (NPI) is a 10-digit number issued to healthcare providers by CMS under HIPAA.|Pattern match, context and checksum|
 |US_PASSPORT |A US passport number with 9 digits.|Pattern match and context|
+|US_PRESCRIPTION_NUMBER|A US prescription or pharmacy order identifier.|Pattern match, context enhancement, and entity threshold|
+|US_PRIOR_AUTHORIZATION_NUMBER|A US prior authorization identifier used for treatment or drug approval requests.|Pattern match, context enhancement, and entity threshold|
+|US_PROVIDER_TAX_ID|A US provider organization tax identifier (TIN/EIN) used in healthcare billing workflows.|Pattern match, context enhancement, and entity threshold|
+|US_REFERRAL_NUMBER|A US healthcare referral identifier, including specialty or infusion referral numbers.|Pattern match, context enhancement, and entity threshold|
 |US_SSN|A US Social Security Number (SSN) with 9 digits.|Pattern match and context|
 
 ### UK
@@ -124,6 +131,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 ### Philippines
 | FieldType  | Description                                                                                             | Detection Method                         |
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
+| PH_PASSPORT | Philippine Passport Number. Alphanumeric format, usually 1 letter followed by 7 digits and 1 letter, or 2 letters followed by 7 digits (e.g., P1234567A, EB1234567). | Pattern match and context |
 | PH_TIN     | Philippines Taxpayer Identification Number (TIN). 9 or 12-digit number issued by the Bureau of Internal Revenue (BIR). | Pattern match, context, and checksum |
 
 ### Canada
@@ -131,6 +139,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |FieldType|Description|Detection Method|
 |--- |--- |--- |
 |CA_SIN|A Canadian Social Insurance Number (SIN) is a 9-digit number issued by Employment and Social Development Canada (ESDC) to administer government programs. The last digit is a Luhn check digit. SINs starting with 0 or 8 are reserved and not issued.|Pattern match, context, and checksum|
+|CA_POSTAL_CODE|A Canadian postal code in the standard A1A 1A1 format (letter-digit-letter, space, digit-letter-digit). The letters D, F, I, O, Q, U are never used in any letter position; W and Z are additionally excluded from the first letter position.|Pattern match and context|
 
 ### Sweden
 | FieldType  | Description                                                                                             | Detection Method                         |
@@ -142,6 +151,15 @@ For more information, refer to the [adding new recognizers documentation](analyz
 | FieldType  | Description                                                                                             | Detection Method                         |
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
 | ZA_ID_NUMBER | The South African identity number is a 13-digit identifier in the `YYMMDDSSSSCAZ` format, where the trailing digit is validated with the Luhn algorithm. | Pattern match, context, and checksum. |
+| ZA_PASSPORT | The South African passport number is a 9-character identifier with prefix letter A, D, M, or T followed by 8 digits. | Pattern match, context, and validation. |
+| ZA_INCOME_TAX_NUMBER | The South African SARS income tax reference number is a 10-digit numeric identifier, commonly starting with 0, 1, 2, 3, or 9. | Pattern match, context, and validation. |
+| ZA_DRIVER_LICENSE | The South African eNaTIS driver's licence number is an alphanumeric identifier of 10–14 characters. | Pattern match, context, and validation. |
+| ZA_VAT_NUMBER | The South African VAT registration number is a 10-digit identifier starting with 4. | Pattern match, context, and validation. |
+| ZA_COMPANY_REGISTRATION | The South African CIPC company registration number uses modern `YYYY/NNNNNN/NN` format or legacy prefixed formats such as CK. | Pattern match, context, and validation. |
+| ZA_TRAFFIC_REGISTER_NUMBER | The South African eNaTIS traffic register number is a 13-digit identifier for foreigners and organisations, disambiguated from ZA_ID_NUMBER via validation. | Pattern match, context, and validation. |
+| ZA_LICENSE_PLATE | The South African vehicle licence plate uses provincial formats such as compact suffix forms (e.g. KD93GKGP) or spaced layouts (e.g. DK 28 LF GP). | Pattern match, context, and validation. |
+| ZA_MOBILE_NUMBER | The South African mobile (cellular) number uses a 9-digit national significant number with country code +27 or domestic trunk prefix 0 (primarily 06x, 07x, and cellular 08x ranges). | `phonenumbers` match, line-type filter, and context. |
+| ZA_TELEPHONE_NUMBER | The South African telephone number covers geographic landlines (01x–05x) and non-mobile service lines such as toll-free (080), sharecall (086), and VoIP (087). | `phonenumbers` match, line-type filter, and context. |
 
 ### Thai
 | FieldType  | Description                                                                                             | Detection Method                         |

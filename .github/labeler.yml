@@ -1,0 +1,141 @@
+# Path-based labels applied automatically by .github/workflows/label-areas.yml
+#
+# Three facets are applied here:
+#   component - which package the change lives in
+#   area      - which subsystem inside the analyzer it touches
+#   type      - what kind of change it is, where the paths make that clear
+#
+# Labels are not exclusive. A pull request that spans a package and a subsystem
+# receives both, which is intended: the component label answers "what does this
+# release affect", the area label answers "who should review it".
+#
+# Triage labels (needs-decision, good first issue, ...) are applied by hand and
+# must not be listed here, or sync-labels would eventually remove them.
+
+# ---------------------------------------------------------------------------
+# Component
+# ---------------------------------------------------------------------------
+
+analyzer:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-analyzer/**'
+          - 'docs/analyzer/**'
+
+anonymizer:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-anonymizer/**'
+          - 'docs/anonymizer/**'
+
+image-anonymization:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-image-redactor/**'
+          - 'docs/image-redactor/**'
+
+dicom:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/dicom_*.py'
+          - '**/*dicom*'
+
+structured-data:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-structured/**'
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-cli/**'
+
+rest-api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-*/app.py'
+          - 'docs/api-docs/**'
+          - 'docs/api.md'
+
+deployment:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/Dockerfile*'
+          - 'docker-compose*.yml'
+          - 'presidio/**'
+          - 'scripts/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - 'mkdocs.yml'
+          - 'overrides/**'
+          - '*.md'
+
+# ---------------------------------------------------------------------------
+# Area (analyzer subsystems)
+# ---------------------------------------------------------------------------
+
+# Pattern and predefined recognizers.
+# Review rulebook: .github/instructions/recognizers.instructions.md
+PII recognizers:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-analyzer/presidio_analyzer/predefined_recognizers/**'
+          - 'presidio-analyzer/presidio_analyzer/conf/default_recognizers.yaml'
+          - 'docs/supported_entities.md'
+
+# Score boosting from surrounding words, including the lemma matching that
+# behaves differently per language.
+context-enhancement:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-analyzer/presidio_analyzer/context_aware_enhancers/**'
+
+# The pydantic models and registry loading behind YAML configuration.
+# Review rulebook: .github/instructions/yaml-config.instructions.md
+yaml-config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-analyzer/presidio_analyzer/input_validation/**'
+          - 'presidio-analyzer/presidio_analyzer/recognizer_registry/**'
+          - 'presidio-analyzer/presidio_analyzer/conf/**'
+
+# NLP backends: spaCy, Stanza, transformers, GLiNER, LangExtract.
+nlp-engine:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'presidio-analyzer/presidio_analyzer/nlp_engine/**'
+          - 'presidio-analyzer/presidio_analyzer/chunkers/**'
+          - 'presidio-analyzer/presidio_analyzer/llm_utils/**'
+
+# ---------------------------------------------------------------------------
+# Type
+# ---------------------------------------------------------------------------
+
+# Runnable examples and notebooks. Overlaps documentation by design: a sample
+# is documentation, but it is also code that has to keep working, so it needs
+# to be findable on its own.
+samples:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/samples/**'
+
+test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/tests/**'
+          - 'e2e-tests/**'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/pipelines/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/pyproject.toml'
+          - '**/uv.lock'

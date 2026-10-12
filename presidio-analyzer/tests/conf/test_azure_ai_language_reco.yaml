@@ -1,9 +1,15 @@
 recognizer_registry:
   global_regex_flags: 26
   recognizers:
+    # Plain form: `name` doubles as the class selector and is also passed to the
+    # constructor. This is the entry shape from #1457.
     - name: MockAzureAiLanguageRecognizer
       type: predefined
-      ta_client: "test" # This is a placeholder for testing purposes
+    # Rename form: `class_name` selects the class, `name` becomes the instance
+    # name. This is the documented reason the loader passes `name` at all.
+    - name: Azure AI Language PII
+      class_name: MockAzureAiLanguageRecognizer
+      type: predefined
 
 
 supported_languages:

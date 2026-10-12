@@ -1,0 +1,29 @@
+name: Label pull requests by changed paths
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+# pull_request_target is required so that pull requests from forks receive a
+# token with write access; a pull_request event grants read-only on forks and
+# the label call fails silently.
+#
+# The usual pull_request_target risk does not apply here: this workflow never
+# checks out or executes pull request code. It reads the changed file list
+# through the API only, and both this file and .github/labeler.yml are read
+# from the base branch, so a pull request cannot change its own label rules.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-slim
+    steps:
+      - name: Apply component, area and type labels from changed paths
+        uses: actions/labeler@b8dd2d9be0f68b860e7dae5dae7d772984eacd6d # v6.2.0
+        with:
+          # Add labels only. Labels applied by hand are never removed, and a
+          # pull request that stops touching a path keeps the label a reviewer
+          # may already have acted on.
+          sync-labels: false

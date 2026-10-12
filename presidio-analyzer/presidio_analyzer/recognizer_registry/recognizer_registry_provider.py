@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from presidio_analyzer import EntityRecognizer
 from presidio_analyzer.input_validation import ConfigurationValidator
-from presidio_analyzer.nlp_engine import NlpEngine
+from presidio_analyzer.nlp_engine import NlpEngine, NoOpNlpEngine
 from presidio_analyzer.predefined_recognizers import SpacyRecognizer
 from presidio_analyzer.recognizer_registry import RecognizerRegistry
 from presidio_analyzer.recognizer_registry.recognizers_loader_utils import (
@@ -86,6 +86,7 @@ class RecognizerRegistryProvider:
             supported_languages=supported_languages,
             global_regex_flags=global_regex_flags,
         )
+        registry.validate_nlp_engine_compatibility(self.nlp_engine)
 
         return registry
 
@@ -117,6 +118,12 @@ class RecognizerRegistryProvider:
         nlp_engine = self.nlp_engine
 
         if not nlp_engine:
+            return
+
+        if isinstance(nlp_engine, NoOpNlpEngine):
+            logger.info(
+                "Skipping NLP recognizer configuration updates for no-op NLP engine."
+            )
             return
 
         for language in nlp_engine.get_supported_languages():

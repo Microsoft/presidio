@@ -63,6 +63,9 @@ recognizer_registry:
     - language: es
       context: [tarjeta, credito, visa, mastercard, cc, amex, discover, jcb, diners, maestro, instapayment]
     type: predefined
+    score_thresholds:
+      default: 0.4
+      CREDIT_CARD: 0.7
     
   - name: DateRecognizer
     supported_languages:
@@ -118,6 +121,8 @@ recognizer_registry:
       - Profesora
 """
 ```
+
+Each recognizer can set a `default` threshold and entity-specific overrides in `score_thresholds`. Supplying `analyze(score_threshold=...)` bypasses recognizer-level thresholds for that request. When omitted, precedence is an entity override, the recognizer default, then the analyzer's `default_score_threshold`.
 
 ### NLP Engine parameters
 

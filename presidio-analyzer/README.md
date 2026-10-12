@@ -20,7 +20,7 @@ Presidio analyzer supports language model-based PII/PHI detection (LLMs, SLMs) f
 - **Azure OpenAI** - Cloud-based deployment with enterprise features
 
 ```bash
-pip install presidio-analyzer[langextract]
+pip install "presidio-analyzer[langextract]"
 ```
 
 #### Quick Usage

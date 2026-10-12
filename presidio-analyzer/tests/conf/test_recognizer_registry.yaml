@@ -5,6 +5,9 @@ recognizers:
     - en
     supported_entity: IT_FISCAL_CODE
     type: predefined
+    score_thresholds:
+      default: 0.4
+      CREDIT_CARD: 0.8
 
   - name: ItFiscalCodeRecognizer
     type: predefined
@@ -27,6 +30,8 @@ recognizers:
     deny_list_score: 1
     type: custom
     enabled: true
+    score_thresholds:
+      ZIP: 0.6
 
   - name: "ZipCodeRecognizer"
     supported_language: "de"

@@ -25,6 +25,8 @@ class AzureAILanguageRecognizer(RemoteRecognizer):
         ta_client: Optional["TextAnalyticsClient"] = None,
         azure_ai_key: Optional[str] = None,
         azure_ai_endpoint: Optional[str] = None,
+        name: Optional[str] = None,
+        context: Optional[List[str]] = None,
     ):
         """
         Wrap the PII detection in Azure AI Language.
@@ -36,15 +38,24 @@ class AzureAILanguageRecognizer(RemoteRecognizer):
         the client will be created using the key and endpoint.
         :param azure_ai_key: Azure AI for language key
         :param azure_ai_endpoint: Azure AI for language endpoint
+        :param name: Name of the recognizer. Defaults to "Azure AI Language PII".
+        :param context: List of context words to boost confidence score.
 
         For more info, see https://learn.microsoft.com/en-us/azure/ai-services/language-service/personally-identifiable-information/overview
         """
 
+        # `name` and `context` are appended last so existing positional callers
+        # are unaffected. They exist because RecognizerListLoader passes both
+        # when building a recognizer from a registry configuration, and
+        # RemoteRecognizer.__init__ accepts neither **kwargs nor unknown keys.
+        # Without them, any YAML entry naming this class raises TypeError before
+        # the registry finishes loading (#1457, and again after #1800).
         super().__init__(
             supported_entities=supported_entities,
             supported_language=supported_language,
-            name="Azure AI Language PII",
+            name=name if name else "Azure AI Language PII",
             version="5.2.0",
+            context=context,
         )
 
         is_available = bool(TextAnalyticsClient)

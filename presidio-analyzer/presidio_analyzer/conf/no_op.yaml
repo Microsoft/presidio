@@ -1,0 +1,4 @@
+nlp_engine_name: no_op
+models:
+  - lang_code: en
+    model_name: no_op

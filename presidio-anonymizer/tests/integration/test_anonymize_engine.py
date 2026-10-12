@@ -1,4 +1,5 @@
 import re
+import json
 
 import pytest
 
@@ -27,7 +28,7 @@ def test_given_url_at_the_end_then_we_redact_is_successfully():
     ]
     expected_result = (
         '{"text": "The url is ", "items": [{"start": 11, "end": 11, "entity_type": '
-        '"URL", "text": "", "operator": "redact"}]}'
+        '"URL", "text": "", "operator": "redact", "score": 1.0}]}'
     )
     run_engine_and_validate(text, anonymizer_config, analyzer_results, expected_result)
 
@@ -63,9 +64,9 @@ def test_given_name_and_phone_number_then_we_anonymize_correctly():
     expected_result = (
         '{"text": "hello world, my name is ********. My number is: '
         '03-******4", "items": [{"start": 48, "end": 57, "entity_type": '
-        '"PHONE_NUMBER", "text": "03-******", "operator": "mask"}, '
+        '"PHONE_NUMBER", "text": "03-******", "operator": "mask", "score": 0.95}, '
         '{"start": 24, "end": 32, "entity_type": "NAME", '
-        '"text": "********", "operator": "mask"}]}'
+        '"text": "********", "operator": "mask", "score": 0.8}]}'
     )
     run_engine_and_validate(text, anonymizer_config, analyzer_results, expected_result)
 
@@ -85,9 +86,9 @@ def test_given_name_and_phone_number_without_anonymizers_then_we_use_default():
         '{"text": "hello world, my name is <NAME>. My number is: '
         '<PHONE_NUMBER>4", "items": [{"start": 46, "end": 60, '
         '"entity_type": "PHONE_NUMBER", "text": "<PHONE_NUMBER>", '
-        '"operator": "replace"}, {"start": 24, "end": 30, '
+        '"operator": "replace", "score": 0.95}, {"start": 24, "end": 30, '
         '"entity_type": "NAME", "text": "<NAME>", '
-        '"operator": "replace"}]}'
+        '"operator": "replace", "score": 0.8}]}'
     )
     run_engine_and_validate(text, anonymizer_config, analyzer_results, expected_result)
 
@@ -106,9 +107,9 @@ def test_given_redact_and_replace_then_we_anonymize_successfully():
         '{"text": "hello world, my name is . My number is: '
         '<PHONE_NUMBER>4", "items": [{"start": 40, "end": 54, '
         '"entity_type": "PHONE_NUMBER", "text": "<PHONE_NUMBER>", '
-        '"operator": "replace"}, {"start": 24, "end": 24, '
+        '"operator": "replace", "score": 0.95}, {"start": 24, "end": 24, '
         '"entity_type": "NAME", "text": "", "operator": '
-        '"redact"}]}'
+        '"redact", "score": 0.8}]}'
     )
     run_engine_and_validate(text, anonymizer_config, analyzer_results, expected_result)
 
@@ -128,13 +129,13 @@ def test_given_intersecting_entities_then_we_anonymize_correctly():
         '{"text": "hello world, my name is <FULL_NAME><LAST_NAME> My '
         'number is: <PHONE_NUMBER><SSN>4", "items": [{"start": 75, '
         '"end": 80, "entity_type": "SSN", "text": "<SSN>", '
-        '"operator": "replace"}, {"start": 61, "end": 75, '
+        '"operator": "replace", "score": 0.8}, {"start": 61, "end": 75, '
         '"entity_type": "PHONE_NUMBER", "text": "<PHONE_NUMBER>", '
-        '"operator": "replace"}, {"start": 35, "end": 46, '
+        '"operator": "replace", "score": 0.95}, {"start": 35, "end": 46, '
         '"entity_type": "LAST_NAME", "text": "<LAST_NAME>", '
-        '"operator": "replace"}, {"start": 24, "end": 35, '
+        '"operator": "replace", "score": 0.6}, {"start": 24, "end": 35, '
         '"entity_type": "FULL_NAME", "text": "<FULL_NAME>", '
-        '"operator": "replace"}]}'
+        '"operator": "replace", "score": 0.6}]}'
     )
     run_engine_and_validate(text, anonymizer_config, analyzer_results, expected_result)
 
@@ -149,7 +150,7 @@ def test_given_intersecting_the_same_entities_then_we_anonymize_correctly():
     expected_result = (
         '{"text": "hello world, my name is <FULL_NAME> My number is: 03-4453334", '
         '"items": [{"start": 24, "end": 35, "entity_type": "FULL_NAME",'
-        ' "text": "<FULL_NAME>", "operator": "replace"}]}'
+        ' "text": "<FULL_NAME>", "operator": "replace", "score": 0.6}]}'
     )
     run_engine_and_validate(text, anonymizer_config, analyzer_results, expected_result)
 
@@ -318,7 +319,6 @@ def test_when_hash_with_user_provided_salt_then_hash_is_reproducible():
 )
 def test_hash_with_known_salt_produces_expected_output(text, salt, hash_type, expected_hash):
     """Test that hashing with a known salt produces expected deterministic output."""
-    from presidio_anonymizer import AnonymizerEngine
     
     params = {"hash_type": hash_type, "salt": salt}
     anonymizer_config = {"DEFAULT": OperatorConfig("hash", params)}
@@ -337,6 +337,95 @@ def test_hash_with_known_salt_produces_expected_output(text, salt, hash_type, ex
     # Verify it's reproducible
     result2 = engine.anonymize(text, analyzer_results, anonymizer_config)
     assert result2.items[0].text == expected_hash
+
+
+def test_given_single_entity_then_score_is_propagated_to_result():
+    """Score from analyzer result appears on the corresponding OperatorResult."""
+    text = "My name is Jane Doe"
+    anonymizer_config = {"PERSON": OperatorConfig("replace")}
+    analyzer_results = [
+        RecognizerResult(start=11, end=19, score=0.85, entity_type="PERSON"),
+    ]
+
+    engine = AnonymizerEngine()
+    result = engine.anonymize(text, analyzer_results, anonymizer_config)
+
+    assert result.items[0].score == 0.85
+
+
+def test_given_multiple_entities_then_each_score_is_propagated_correctly():
+    """Each OperatorResult carries the score of its originating RecognizerResult."""
+    text = "My name is Jane Doe. My number is 034453334"
+    anonymizer_config = {}
+    analyzer_results = [
+        RecognizerResult(start=11, end=19, score=0.8, entity_type="NAME"),
+        RecognizerResult(start=34, end=43, score=0.95, entity_type="PHONE_NUMBER"),
+    ]
+
+    engine = AnonymizerEngine()
+    result = engine.anonymize(text, analyzer_results, anonymizer_config)
+
+    result_by_type = {item.entity_type: item for item in result.items}
+    assert result_by_type["NAME"].score == 0.8
+    assert result_by_type["PHONE_NUMBER"].score == 0.95
+
+
+@pytest.mark.parametrize(
+    "operator_name,operator_params",
+    [
+        ("replace", {}),
+        ("redact", {}),
+        ("mask", {"masking_char": "*", "chars_to_mask": 4, "from_end": False}),
+        ("hash", {}),
+    ],
+)
+def test_given_different_operators_then_score_is_always_propagated(
+    operator_name, operator_params
+):
+    """Score is propagated regardless of which operator is applied."""
+    text = "My name is Jane Doe"
+    anonymizer_config = {"NAME": OperatorConfig(operator_name, operator_params)}
+    analyzer_results = [
+        RecognizerResult(start=11, end=19, score=0.75, entity_type="NAME"),
+    ]
+
+    engine = AnonymizerEngine()
+    result = engine.anonymize(text, analyzer_results, anonymizer_config)
+
+    assert result.items[0].score == 0.75
+
+
+def test_given_conflicting_entities_then_winning_entity_score_is_preserved():
+    """When conflict resolution drops an entity, the surviving entity keeps its own score."""
+    text = "hello world, my name is Jane Doe"
+    anonymizer_config = {}
+    analyzer_results = [
+        RecognizerResult(start=24, end=32, score=0.6, entity_type="FULL_NAME"),
+        RecognizerResult(start=24, end=28, score=0.9, entity_type="FIRST_NAME"),  # loses
+        RecognizerResult(start=24, end=30, score=0.8, entity_type="NAME"),        # loses
+    ]
+
+    engine = AnonymizerEngine()
+    result = engine.anonymize(text, analyzer_results, anonymizer_config)
+
+    assert len(result.items) == 1
+    assert result.items[0].entity_type == "FULL_NAME"
+    assert result.items[0].score == 0.6  # its own score, not the score of dropped entities
+
+
+def test_given_score_in_result_then_it_is_present_in_json_output():
+    """Score is included in to_json() serialized output."""
+    text = "My name is Jane Doe"
+    anonymizer_config = {}
+    analyzer_results = [
+        RecognizerResult(start=11, end=19, score=0.85, entity_type="NAME"),
+    ]
+
+    engine = AnonymizerEngine()
+    result = engine.anonymize(text, analyzer_results, anonymizer_config)
+
+    output = json.loads(result.to_json())
+    assert output["items"][0]["score"] == pytest.approx(0.85)
 
 
 def run_engine_and_validate(

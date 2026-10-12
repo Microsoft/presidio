@@ -1,0 +1,21 @@
+supported_languages:
+  - en
+global_regex_flags: 26
+
+recognizers:
+  - name: "HuggingFace NER with chunker"
+    type: predefined
+    class_name: HuggingFaceNerRecognizer
+    model_name: dslim/bert-base-NER
+    supported_languages:
+      - en
+    supported_entities:
+      - PERSON
+      - LOCATION
+      - ORGANIZATION
+    aggregation_strategy: simple
+    device: cpu
+    text_chunker:
+      chunker_type: character
+      chunk_size: 300
+      chunk_overlap: 40

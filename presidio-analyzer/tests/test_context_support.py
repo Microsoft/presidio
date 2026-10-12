@@ -166,7 +166,7 @@ def test_when_text_with_only_additional_context_lemma_based_context_enhancer_the
         results_with_additional_context[0].analysis_explanation.supportive_context_word
         == "driver"
     )
-    assert results_with_additional_context[0].score == 0.6499999999999999
+    assert results_with_additional_context[0].score == pytest.approx(0.65)
 
 
 def test_when_text_with_context_then_improves_score(

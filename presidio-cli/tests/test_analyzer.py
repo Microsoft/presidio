@@ -1,5 +1,6 @@
 import pytest
-from presidio_cli.analyzer import analyze, line_generator
+from presidio_analyzer import RecognizerResult
+from presidio_cli.analyzer import PIIProblem, analyze, line_generator
 
 
 def test_line_generator():
@@ -59,3 +60,13 @@ def test_analyze_with_allow_list(en_core_web_lg, config, config_with_allow_list)
 def test_analyze_type_error(en_core_web_lg, config):
     with pytest.raises(TypeError):
         analyze({}, config)
+
+
+@pytest.mark.parametrize(
+    ("score", "level"),
+    [(1.0, "error"), (0.99, "warning"), (0.85, "warning"), (0.0, "warning")],
+)
+def test_pii_problem_level_is_error_only_for_full_confidence(score, level):
+    problem = PIIProblem(1, RecognizerResult("PERSON", 0, 5, score))
+
+    assert problem.level == level

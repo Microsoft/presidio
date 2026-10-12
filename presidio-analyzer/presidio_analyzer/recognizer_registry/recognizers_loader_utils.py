@@ -20,6 +20,7 @@ from typing import (
 import yaml
 
 from presidio_analyzer import EntityRecognizer, PatternRecognizer
+from presidio_analyzer.score_thresholds import normalize_score_thresholds
 
 logger = logging.getLogger("presidio-analyzer")
 
@@ -291,18 +292,11 @@ class RecognizerListLoader:
         """
         kwargs = {**recognizer_conf, **language_conf}
 
-        # Cleanup: Remove provided entity arguments if they are explicitly None
-        if (
-            RecognizerListLoader.SUPPORTED_ENTITY in kwargs
-            and kwargs[RecognizerListLoader.SUPPORTED_ENTITY] is None
-        ):
-            kwargs.pop(RecognizerListLoader.SUPPORTED_ENTITY, None)
-
-        if (
-            RecognizerListLoader.SUPPORTED_ENTITIES in kwargs
-            and kwargs[RecognizerListLoader.SUPPORTED_ENTITIES] is None
-        ):
-            kwargs.pop(RecognizerListLoader.SUPPORTED_ENTITIES, None)
+        # Strip None values so that recognizer constructors use their own
+        # defaults.  Config models override model_dump(exclude_none=True)
+        # but that override is not invoked during parent model serialization,
+        # so None values can leak through.
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
         try:
             params = inspect.signature(recognizer_cls.__init__).parameters
@@ -335,7 +329,19 @@ class RecognizerListLoader:
                         RecognizerListLoader.SUPPORTED_ENTITY, supported_entities[0]
                     )
 
-        # 2. Filter: Remove keys that are NOT in the signature
+        # 2. Convert text_chunker dict to BaseTextChunker instance
+        if "text_chunker" in kwargs and isinstance(kwargs["text_chunker"], dict):
+            from presidio_analyzer.chunkers import TextChunkerProvider
+
+            # Strip None values that may leak from Pydantic model_dump
+            chunker_config = {
+                k: v for k, v in kwargs["text_chunker"].items() if v is not None
+            }
+            kwargs["text_chunker"] = TextChunkerProvider(
+                chunker_config
+            ).create_chunker()
+
+        # 3. Filter: Remove keys that are NOT in the signature
 
         # For supported_entities (plural):
         # If not explicitly accepted, remove unless **kwargs is present (compat).
@@ -393,9 +399,13 @@ class RecognizerListLoader:
             "supported_languages",
             "class_name",
             "country_code",
+            "score_thresholds",
         }
-        custom_to_exclude = {"enabled", "type", "class_name"}
+        custom_to_exclude = {"enabled", "type", "class_name", "score_thresholds"}
         for recognizer_conf in predefined:
+            score_thresholds = normalize_score_thresholds(
+                recognizer_conf.get("score_thresholds")
+            )
             for language_conf in RecognizerListLoader._get_recognizer_languages(
                 recognizer_conf=recognizer_conf, supported_languages=supported_languages
             ):
@@ -421,19 +431,25 @@ class RecognizerListLoader:
                         new_conf, language_conf, recognizer_cls
                     )
 
-                    recognizer_instances.append(recognizer_cls(**kwargs))
+                    recognizer = recognizer_cls(**kwargs)
+                    recognizer.score_thresholds = score_thresholds
+                    recognizer_instances.append(recognizer)
 
         for recognizer_conf in custom:
             if RecognizerListLoader.is_recognizer_enabled(recognizer_conf):
+                score_thresholds = normalize_score_thresholds(
+                    recognizer_conf.get("score_thresholds")
+                )
                 new_conf = RecognizerListLoader._filter_recognizer_fields(
                     recognizer_conf, to_exclude=custom_to_exclude
                 )
-                recognizer_instances.extend(
-                    RecognizerListLoader._create_custom_recognizers(
-                        recognizer_conf=new_conf,
-                        supported_languages=supported_languages,
-                    )
+                custom_recognizers = RecognizerListLoader._create_custom_recognizers(
+                    recognizer_conf=new_conf,
+                    supported_languages=supported_languages,
                 )
+                for recognizer in custom_recognizers:
+                    recognizer.score_thresholds = score_thresholds
+                recognizer_instances.extend(custom_recognizers)
 
         for recognizer_conf in recognizer_instances:
             if isinstance(recognizer_conf, PatternRecognizer):

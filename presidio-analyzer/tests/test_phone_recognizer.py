@@ -28,6 +28,9 @@ def recognizer():
         ("BR: +55 11 98456 5666", 1, ["PHONE_NUMBER"], ((4, 21), ), 0.4),
         ("My Japanese number is 090-1234-5678", 1, ["PHONE_NUMBER"],((22, 35), ), 0.4),
         ("My CN number is 13812345678", 1, ["PHONE_NUMBER"],((16, 27), ), 0.4),
+        # GB national-format number: only matched when region is the valid ISO code
+        # "GB" (not "UK"). Regression test for the DEFAULT_SUPPORTED_REGIONS fix.
+        ("My UK number is 020 7946 0958", 1, ["PHONE_NUMBER"], ((16, 29), ), 0.4),
         # fmt: on
     ],
 )

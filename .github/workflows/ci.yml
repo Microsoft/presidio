@@ -92,11 +92,12 @@ jobs:
     env:
       COVERAGE_THRESHOLD: 90
       PRIMARY_PYTHON: '3.13'
-      # uv's wheel cache lives on the roomy /mnt disk (like the old
-      # POETRY_CACHE_DIR); it is persisted across runs by "Cache uv downloads".
-      # UV_LINK_MODE=copy avoids cross-filesystem hardlink warnings.
+      # Co-locate uv's cache and environment so packages can be hardlinked instead
+      # of duplicated on the runner's single filesystem.
       UV_CACHE_DIR: /mnt/uv-cache
-      UV_LINK_MODE: copy
+      UV_PROJECT_ENVIRONMENT: /mnt/uv-venv
+      UV_LINK_MODE: hardlink
+      PIP_NO_CACHE_DIR: '1'
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
@@ -112,12 +113,11 @@ jobs:
       - name: Install uv
         run: python -m pip install uv==0.11.6
 
-      - name: Prepare uv cache directory on /mnt
+      - name: Prepare uv directories on /mnt
         run: |
-          # /mnt is root-owned, so create the cache dir and hand it to the
-          # runner user before uv (or the cache restore) writes to it.
-          sudo mkdir -p "$UV_CACHE_DIR"
-          sudo chown -R "$(id -u):$(id -g)" "$UV_CACHE_DIR"
+          # /mnt is root-owned, so hand both uv directories to the runner user.
+          sudo mkdir -p "$UV_CACHE_DIR" "$UV_PROJECT_ENVIRONMENT"
+          sudo chown -R "$(id -u):$(id -g)" "$UV_CACHE_DIR" "$UV_PROJECT_ENVIRONMENT"
 
       - name: Cache uv downloads
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.0
@@ -150,7 +150,8 @@ jobs:
           # Override the locked PyPI presidio-analyzer with the in-repo copy so
           # tests run against local analyzer changes; later steps use
           # `uv run --no-sync` so uv won't revert this editable install.
-          uv pip install -e ../presidio-analyzer/.
+          uv pip install --python "$UV_PROJECT_ENVIRONMENT/bin/python" \
+            -e ../presidio-analyzer/.
 
       - name: Download spaCy models
         if: matrix.component.spacy-models != ''
@@ -160,11 +161,19 @@ jobs:
             uv run --no-sync python -m spacy download $model
           done
 
+      - name: Reclaim dependency cache space
+        run: |
+          # Dependencies are installed, so prune before coverage needs workspace space.
+          # Hardlinked environment files remain valid when their cache links are removed.
+          uv cache prune --ci
+          df -h / /mnt
+          du -sh "$UV_CACHE_DIR" "$UV_PROJECT_ENVIRONMENT"
+
       - name: Run tests with coverage
         working-directory: ${{ matrix.component.path }}
         run: |
           PACKAGE_NAME=$(echo "${{ matrix.component.path }}" | sed 's/-/_/g')
-          uv run --no-sync pytest --cov=$PACKAGE_NAME --cov-report=xml:coverage.xml --cov-report=term --cov-report=html -vv --tb=short
+          uv run --no-sync pytest --cov=$PACKAGE_NAME --cov-report=xml:coverage.xml --cov-report=term -vv --tb=short
           
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "Checking PR difference coverage (>= ${{ env.COVERAGE_THRESHOLD }}%) with diff-cover..."
@@ -194,12 +203,6 @@ jobs:
           python -m pip install "tomli==2.4.1; python_version < '3.11'"
           pip install --require-hashes -r ${{ github.workspace }}/.github/pipelines/requirements-build.txt
           python -m build --wheel
-
-      - name: Minimize uv cache
-        if: always()
-        run: |
-          # Trim the persisted cache (recommended for CI by the uv docs).
-          uv cache prune --ci
 
   build-platform-images:
     name: Build ${{ matrix.image }} (${{ matrix.platform }})
@@ -337,16 +340,22 @@ jobs:
       - name: Wait for services to be ready
         run: sleep 60
 
-      - name: Download Ollama model for Ollama LangExtract recognizer tests
+      - name: Download Ollama model for LangExtract recognizer tests
+        if: matrix.platform == 'linux/arm64'
         run: |
-          docker exec $(docker ps -qf "name=ollama") ollama pull qwen2.5:1.5b
-          docker exec $(docker ps -qf "name=ollama") ollama run qwen2.5:1.5b
+          ollama_container="$(docker compose -f docker-compose.yml ps -q ollama)"
+          docker exec "$ollama_container" ollama pull qwen2.5:1.5b
+          docker exec "$ollama_container" ollama run qwen2.5:1.5b
 
       - name: Run E2E tests
         working-directory: e2e-tests
         run: |
           source env/bin/activate
-          pytest -vv --tb=short
+          pytest_args=()
+          if [ "${{ matrix.platform }}" != "linux/arm64" ]; then
+            pytest_args=(-k "not ollama")
+          fi
+          pytest -vv --tb=short "${pytest_args[@]}"
 
       - name: Capture Docker logs on failure (${{ matrix.platform }})
         if: failure()
@@ -424,16 +433,22 @@ jobs:
       - name: Wait for services to be ready
         run: sleep 60
 
-      - name: Download Ollama model for Ollama LangExtract recognizer tests
+      - name: Download Ollama model for LangExtract recognizer tests
+        if: matrix.platform == 'linux/arm64'
         run: |
-          docker exec $(docker ps -qf "name=ollama") ollama pull qwen2.5:1.5b
-          docker exec $(docker ps -qf "name=ollama") ollama run qwen2.5:1.5b
+          ollama_container="$(docker compose -f docker-compose.yml ps -q ollama)"
+          docker exec "$ollama_container" ollama pull qwen2.5:1.5b
+          docker exec "$ollama_container" ollama run qwen2.5:1.5b
 
       - name: Run E2E tests
         working-directory: e2e-tests
         run: |
           source env/bin/activate
-          pytest -vv --tb=short
+          pytest_args=()
+          if [ "${{ matrix.platform }}" != "linux/arm64" ]; then
+            pytest_args=(-k "not ollama")
+          fi
+          pytest -vv --tb=short "${pytest_args[@]}"
 
       - name: Capture Docker logs on failure
         if: failure()

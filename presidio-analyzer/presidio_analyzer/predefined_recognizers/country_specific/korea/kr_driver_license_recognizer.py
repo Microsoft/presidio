@@ -70,6 +70,7 @@ class KrDriverLicenseRecognizer(PatternRecognizer):
         supported_language: str = "ko",
         supported_entity: str = "KR_DRIVER_LICENSE",
         replacement_pairs: Optional[List[Tuple[str, str]]] = None,
+        name: Optional[str] = None,
     ):
         self.replacement_pairs = (
             replacement_pairs if replacement_pairs else [("-", ""), (" ", "")]
@@ -82,6 +83,7 @@ class KrDriverLicenseRecognizer(PatternRecognizer):
             patterns=patterns,
             context=context,
             supported_language=supported_language,
+            name=name,
         )
 
     def validate_result(self, pattern_text: str) -> bool:

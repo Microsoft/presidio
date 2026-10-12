@@ -1,8 +1,8 @@
 """Tests for the Pydantic-based validation system using existing adapted classes."""
+# ruff: noqa: D103,E501
+
 import pytest
-
 from presidio_analyzer.input_validation import ConfigurationValidator
-
 
 # ========== Language Code Validation Tests ==========
 
@@ -104,6 +104,14 @@ def test_validate_score_threshold_way_above():
     with pytest.raises(ValueError) as exc_info:
         ConfigurationValidator.validate_score_threshold(100.0)
     assert "must be between 0.0 and 1.0" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("threshold", [True, False, "0.5", None, [], {}])
+def test_validate_score_threshold_non_numeric(threshold):
+    """Test score threshold rejects booleans and non-numeric values."""
+    with pytest.raises(ValueError) as exc_info:
+        ConfigurationValidator.validate_score_threshold(threshold)
+    assert "must be numeric" in str(exc_info.value)
 
 
 # ========== NLP Configuration Validation Tests ==========
@@ -318,6 +326,60 @@ def test_configuration_validator_analyzer_config_valid():
     assert validated == valid_config
 
 
+def test_analyzer_config_rejects_removed_recognizer_score_thresholds_key():
+    with pytest.raises(ValueError, match="Unknown configuration key"):
+        ConfigurationValidator.validate_analyzer_configuration(
+            {
+                "supported_languages": ["en"],
+                "recognizer_score_thresholds": {"CreditCardRecognizer": 0.4},
+            }
+        )
+
+
+def test_registry_config_preserves_valid_score_thresholds():
+    valid_config = {
+        "supported_languages": ["en"],
+        "recognizers": [
+            {
+                "name": "CreditCardRecognizer",
+                "type": "predefined",
+                "score_thresholds": {"default": 0.4, "CREDIT_CARD": 0.7},
+            }
+        ],
+    }
+
+    validated = ConfigurationValidator.validate_recognizer_registry_configuration(
+        valid_config
+    )
+
+    assert validated["recognizers"][0]["score_thresholds"] == {
+        "default": 0.4,
+        "CREDIT_CARD": 0.7,
+    }
+
+
+@pytest.mark.parametrize(
+    "score_thresholds",
+    [False, 0, "", [], {"default": True}, {"default": "0.4"}],
+)
+def test_registry_config_rejects_uncoerced_invalid_score_thresholds(
+    score_thresholds,
+):
+    config = {
+        "supported_languages": ["en"],
+        "recognizers": [
+            {
+                "name": "CreditCardRecognizer",
+                "type": "predefined",
+                "score_thresholds": score_thresholds,
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError):
+        ConfigurationValidator.validate_recognizer_registry_configuration(config)
+
+
 def test_analyzer_config_minimal():
     """Test minimal valid analyzer configuration."""
     valid_config = {
@@ -358,6 +420,20 @@ def test_configuration_validator_analyzer_config_invalid_threshold():
         ConfigurationValidator.validate_analyzer_configuration(invalid_config)
 
     assert "must be between 0.0 and 1.0" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("threshold", [True, "0.5"])
+def test_configuration_validator_analyzer_config_non_numeric_threshold(threshold):
+    """Test ConfigurationValidator rejects non-numeric score thresholds."""
+    invalid_config = {
+        "supported_languages": ["en"],
+        "default_score_threshold": threshold,
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        ConfigurationValidator.validate_analyzer_configuration(invalid_config)
+
+    assert "must be numeric" in str(exc_info.value)
 
 
 def test_analyzer_config_not_dict():

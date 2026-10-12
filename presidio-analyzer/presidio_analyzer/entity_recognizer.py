@@ -1,8 +1,10 @@
 import logging
 from abc import abstractmethod
+from itertools import groupby
 from typing import TYPE_CHECKING, ClassVar, Dict, List, Optional, Tuple
 
 from presidio_analyzer import RecognizerResult
+from presidio_analyzer.score_thresholds import normalize_score_thresholds
 
 if TYPE_CHECKING:
     from presidio_analyzer.nlp_engine import NlpArtifacts
@@ -33,6 +35,7 @@ class EntityRecognizer:
         recognizers may set it per instance; predefined recognizers should
         prefer the class-level :attr:`COUNTRY_CODE`. Values are stripped,
         lower-cased, and must match :attr:`COUNTRY_CODE` when both are set.
+    :param score_thresholds: Optional default and entity-specific score thresholds.
     """
 
     MIN_SCORE = 0
@@ -53,6 +56,7 @@ class EntityRecognizer:
         version: str = "0.0.1",
         context: Optional[List[str]] = None,
         country_code: Optional[str] = None,
+        score_thresholds: Optional[Dict[str, float]] = None,
     ):
         self.supported_entities = supported_entities
 
@@ -67,12 +71,26 @@ class EntityRecognizer:
         self.version = version
         self.is_loaded = False
         self.context = context if context else []
+        self.score_thresholds = score_thresholds
 
         self._country_code = self._resolve_country_code(country_code)
 
         self.load()
         logger.info("Loaded recognizer: %s", self.name)
         self.is_loaded = True
+
+    @property
+    def score_thresholds(self) -> Dict[str, float]:
+        """Return a defensive copy of this recognizer's score thresholds."""
+        return self._score_thresholds.copy()
+
+    @score_thresholds.setter
+    def score_thresholds(self, value: Optional[Dict[str, float]]) -> None:
+        """Validate and store this recognizer's score thresholds.
+
+        :param value: The default and entity-specific score thresholds.
+        """
+        self._score_thresholds = normalize_score_thresholds(value)
 
     @classmethod
     def _resolve_country_code(cls, passed: Optional[str]) -> Optional[str]:
@@ -258,36 +276,57 @@ class EntityRecognizer:
     @staticmethod
     def remove_duplicates(results: List[RecognizerResult]) -> List[RecognizerResult]:
         """
-        Remove duplicate results.
+        Remove duplicate, zero-score, and contained results.
 
-        Remove duplicates in case the two results
-        have identical start and ends and types.
+        Results with a score of zero are removed. A result is also removed if another
+        result of the same type fully contains it and has an equal or higher score.
         :param results: List[RecognizerResult]
         :return: List[RecognizerResult]
         """
         results = list(set(results))
-        results = sorted(results, key=lambda x: (-x.score, x.start, -(x.end - x.start)))
+        results = sorted(
+            results,
+            key=lambda x: (
+                str(x.entity_type),
+                x.start,
+                -(x.end - x.start),
+                -x.score,
+            ),
+        )
         filtered_results = []
 
-        for result in results:
-            if result.score == 0:
-                continue
+        for _, entity_results in groupby(
+            results, key=lambda result: result.entity_type
+        ):
+            active_results = []
 
-            to_keep = result not in filtered_results  # equals based comparison
-            if to_keep:
-                for filtered in filtered_results:
+            for result in entity_results:
+                if result.score == 0:
+                    continue
+
+                # Only overlapping results can contain the current result.
+                active_results = [
+                    filtered
+                    for filtered in active_results
+                    if filtered.end >= result.start
+                ]
+
+                to_keep = True
+                for filtered in active_results:
                     # If result is contained in one of the other results
-                    if (
-                        result.contained_in(filtered)
-                        and result.entity_type == filtered.entity_type
-                    ):
+                    if result.contained_in(filtered) and result.score <= filtered.score:
                         to_keep = False
                         break
 
-            if to_keep:
-                filtered_results.append(result)
+                if to_keep:
+                    filtered_results.append(result)
+                    active_results.append(result)
 
-        return filtered_results
+        # Restore the existing score-first result order.
+        return sorted(
+            filtered_results,
+            key=lambda x: (-x.score, x.start, -(x.end - x.start)),
+        )
 
     @staticmethod
     def sanitize_value(text: str, replacement_pairs: List[Tuple[str, str]]) -> str:

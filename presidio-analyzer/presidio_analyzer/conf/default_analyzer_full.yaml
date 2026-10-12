@@ -57,6 +57,9 @@ recognizer_registry:
       - language: en
         context: [credit, card, visa, mastercard, cc, amex, discover, jcb, diners, maestro, instapayment]
       type: predefined
+      # score_thresholds:
+      #   default: 0.4
+      #   CREDIT_CARD: 0.7
 
     - name: UsBankRecognizer
       type: predefined

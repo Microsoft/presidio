@@ -98,6 +98,8 @@ def _download_model(engine_name: str, model_name: Union[str, Dict[str, str]]) ->
             _install_transformers_spacy_models(model_name)
         else:
             raise ImportError("transformers is not installed")
+    elif engine_name == "no_op":
+        logger.info("No NLP model installation required for no_op engine")
     else:
         raise ValueError(f"Unsupported nlp engine: {engine_name}")
 

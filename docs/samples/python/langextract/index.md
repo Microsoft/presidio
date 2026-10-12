@@ -66,7 +66,7 @@ Azure OpenAI provides cloud-based access to OpenAI models (GPT-4o, GPT-4, GPT-3.
 
 1. **Install Presidio with LangExtract support**:
    ```sh
-   pip install presidio-analyzer[langextract]
+   pip install "presidio-analyzer[langextract]"
    ```
 
 2. **Set up Ollama**
@@ -199,7 +199,7 @@ Azure OpenAI provides cloud-based access to OpenAI models (GPT-4o, GPT-4, GPT-3.
 
 1. **Install Presidio with LangExtract support**:
    ```sh
-   pip install presidio-analyzer[langextract]
+   pip install "presidio-analyzer[langextract]"
    ```
    
    This installs `langextract` with OpenAI support, including the OpenAI Python SDK and Azure Identity libraries.

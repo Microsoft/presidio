@@ -16,52 +16,54 @@ The project is structured so that:
 - In the project root directory, you will find common code for using, serving and testing Presidio
     as a cluster of services, as well as CI/CD pipelines codebase and documentation.
 
-### Setting up Poetry
+### Setting up uv
 
-[Poetry](https://python-poetry.org/) is Python package manager. It is used to manage dependencies and virtual
-environments for Presidio services.
-Follow these steps when starting to work on a Presidio service with poetry:
+[uv](https://docs.astral.sh/uv/) is the Python package manager used to manage dependencies and virtual
+environments for Presidio services (the CI installs dependencies the same way).
+Follow these steps when starting to work on a Presidio service with uv:
 
-1. Install poetry
+1. Install uv
 
-    - Using Pip
+    - Using the standalone installer (you can inspect [install.sh](https://astral.sh/uv/install.sh) before running it)
 
         ```sh
-        pip install poetry
+        curl -LsSf https://astral.sh/uv/install.sh | sh
         ```
 
     - Using Homebrew (in MacOS)
 
         ```
-        brew install poetry
+        brew install uv
         ```
 
-    Additional installation instructions for poetry: <https://python-poetry.org/docs/#installation>
+    Additional installation instructions for uv: <https://docs.astral.sh/uv/getting-started/installation/>
 
-2. Have poetry create a virtualenv for the project and install all requirements in the pyproject.toml,
+2. Have uv create a virtualenv for the project and install all requirements in the pyproject.toml,
     including dev requirements.
 
     For example, in the `presidio-analyzer` folder, run:
 
     ```
-    poetry install --all-extras
+    uv sync --all-extras --group dev
     ```
+
+    Add `--locked` to install the exact locked dependency graph (matching CI behavior).
 
 3. Run all tests:
 
     ```
-    poetry run pytest
+    uv run pytest
     ```
 
 4. To run arbitrary scripts within the virtual env, start the command with
-    `poetry run`. For example:
-    1. `poetry run ruff check`
-    2. `poetry run pip freeze`
-    3. `poetry run python -m spacy download en_core_web_lg`
+    `uv run`. For example:
+    1. `uv run ruff check`
+    2. `uv run pip freeze`
+    3. `uv run python -m spacy download en_core_web_lg`
 
-    Command 3 downloads the default spacy model needed for Presidio Analyzer.`
+    Command 3 downloads the default spacy model needed for Presidio Analyzer.
 
-#### Alternatively, activate the virtual environment and use the commands using [this method](https://python-poetry.org/docs/basic-usage/#activating-the-virtual-environment).
+#### Alternatively, [activate the virtual environment](https://docs.astral.sh/uv/pip/environments/#using-a-virtual-environment) and run the commands without the `uv run` prefix.
 
 ### Development guidelines
 
@@ -93,9 +95,9 @@ use docker-compose ps:
 ```bash
 >docker-compose ps
 CONTAINER ID   IMAGE                       COMMAND                  CREATED         STATUS         PORTS                    NAMES
-6d5a258d19c2   presidio-anonymizer         "/bin/sh -c 'poetry …"   6 minutes ago   Up 6 minutes   0.0.0.0:5001->5001/tcp   presidio_presidio-anonymizer_1
-9aad2b68f93c   presidio-analyzer           "/bin/sh -c 'poetry …"   2 days ago      Up 6 minutes   0.0.0.0:5002->5001/tcp   presidio_presidio-analyzer_1
-1448dfb3ec2b   presidio-image-redactor     "/bin/sh -c 'poetry …"   2 seconds ago   Up 2 seconds   0.0.0.0:5003->5001/tcp   presidio_presidio-image-redactor_1
+6d5a258d19c2   presidio-anonymizer         "./entrypoint.sh"   6 minutes ago   Up 6 minutes   0.0.0.0:5001->5001/tcp   presidio_presidio-anonymizer_1
+9aad2b68f93c   presidio-analyzer           "./entrypoint.sh"   2 days ago      Up 6 minutes   0.0.0.0:5002->5001/tcp   presidio_presidio-analyzer_1
+1448dfb3ec2b   presidio-image-redactor     "./entrypoint.sh"   2 seconds ago   Up 2 seconds   0.0.0.0:5003->5001/tcp   presidio_presidio-image-redactor_1
 ```
 
 Edit docker-compose.yml configuration file to change the default ports.
@@ -138,7 +140,7 @@ Running the tests locally can be done in two ways:
 1. Using cli, from each service directory, run:
 
     ```sh
-    poetry run pytest
+    uv run pytest
     ```
 
 2. Using your IDE.
@@ -202,7 +204,7 @@ Running the e2e-tests locally can be done in two ways:
 
 Presidio services are PEP8 compliant and continuously enforced on style guide issues during the build process using `ruff`, in turn running `flake8` and other linters.
 
-Running ruff locally, using `poetry run ruff check`, you can check for those issues prior to committing a change.
+Running ruff locally, using `uv run ruff check`, you can check for those issues prior to committing a change.
 
 Ruff runs linters in addition to the basic `flake8` functionality, Presidio uses linters as part as ruff such as:
 

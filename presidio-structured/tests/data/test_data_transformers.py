@@ -1,5 +1,6 @@
 import pytest
 from pandas import DataFrame
+from presidio_structured.config import StructuredAnalysis
 from presidio_structured.data.data_processors import (
     DataProcessorBase,
     PandasDataProcessor,
@@ -23,6 +24,25 @@ class TestPandasDataProcessor:
                 assert all(result[key] == "PERSON_REPLACEMENT")
             else:
                 assert all(result[key] == "DEFAULT_REPLACEMENT")
+
+    def test_process_column_name_not_an_identifier(self, operators):
+        # Column names holding PII are often not valid Python identifiers
+        # ("Full Name", "e-mail", ...). itertuples renamed those to positional
+        # fields, so the name-based getattr lookup raised AttributeError,
+        # aborting the run with any later PII columns left unredacted.
+        processor = PandasDataProcessor()
+        df = DataFrame(
+            {
+                "Full Name": ["John Doe", "Jane Doe"],
+                "email": ["john@example.com", "jane@example.com"],
+            }
+        )
+        analysis = StructuredAnalysis(
+            entity_mapping={"Full Name": "PERSON", "email": "EMAIL_ADDRESS"}
+        )
+        result = processor.operate(df, analysis, operators)
+        assert all(result["Full Name"] == "PERSON_REPLACEMENT")
+        assert all(result["email"] == "DEFAULT_REPLACEMENT")
 
     def test_process_no_default_should_raise(self, sample_df, operators_no_default, tabular_analysis):
         processor = PandasDataProcessor()
