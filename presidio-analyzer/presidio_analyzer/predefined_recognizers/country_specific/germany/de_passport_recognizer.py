@@ -54,7 +54,7 @@ class DePassportRecognizer(PatternRecognizer):
     PATTERNS = [
         Pattern(
             "Reisepassnummer (Strict ICAO charset)",
-            r"\b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{7}[0-9]\d?\b",
+            r"\b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{7}[0-9]\d?(?:\b|(?=D<))",
             0.4,
         ),
     ]

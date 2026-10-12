@@ -45,6 +45,8 @@ def entities():
         # Number + MRZ check digit → validated
         ("C01X00T478", 1, ((0, 10),), True),
         ("F123456712", 1, ((0, 10),), True),
+        # MRZ line 2: nationality D follows the check digit
+        ("C01X00T478D<<6408125F2702283<<<<<<<<<<<<<<<4", 1, ((0, 10),), True),
         # Number followed by a wrong MRZ check digit — dropped
         ("C01X00T470", 0, (), False),
         ("F123456719", 0, (), False),
