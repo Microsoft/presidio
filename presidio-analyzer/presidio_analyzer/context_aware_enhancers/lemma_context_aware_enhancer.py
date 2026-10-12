@@ -33,8 +33,9 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
     :param token_text_languages: ISO 639-1 codes of languages for which context
         words are compared with the token text instead of the lemma.
         Useful where the lemmatizer splits words into morphemes: the Korean
-        spaCy models lemmatize "연락처가" as "연+락처+가", so "연락처" is not
-        found. Defaults to None (always compare with lemmas).
+        spaCy models can lemmatize "연락처가" as "연+락처+가" (the split
+        depends on the surrounding text), so "연락처" is not found.
+        Defaults to None (always compare with lemmas).
     """
 
     def __init__(
