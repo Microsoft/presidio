@@ -69,8 +69,10 @@ class FiPersonalIdentityCodeRecognizer(PatternRecognizer):
             "A": 2000, "B": 2000, "C": 2000, "D": 2000, "E": 2000, "F": 2000,
         }
         # The separator is constrained to the keys above by the pattern, so a
-        # default is only a safeguard for direct calls with other text.
-        century = century_by_separator.get(pattern_text[6], 2000)
+        # default is only a safeguard for direct calls with other text. The
+        # pattern matches case-insensitively, so upper-case the separator too:
+        # a lower-case "y" would otherwise fall through to the 2000s default.
+        century = century_by_separator.get(pattern_text[6].upper(), 2000)
         try:
             # Checking if we do not have invalid dates e.g. 310211.
             datetime(

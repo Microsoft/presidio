@@ -170,6 +170,12 @@ def entities():
         # 1800 is not a leap year, so 29 Feb 1800 is not a real date. (strptime
         # alone reads the year as 2000, which IS a leap year, and accepts it.)
         ("290200+311B", 0, ()),
+        # The same date with a lower-case 1900s separator. 1900 is not a leap
+        # year either, so the separator's case must not move it to 2000.
+        ("290200y1239", 0, ()),
+        ("290200Y1239", 0, ()),
+        # 29 Feb 2000 is real, in either case.
+        ("290200a1239", 1, ((0, 11),)),
     ],
 )
 def test_when_all_finnish_personal_identity_code_then_succeed(
