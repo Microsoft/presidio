@@ -182,7 +182,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 
 | Entity Type | Description | Detection Method |
 | --- | --- | --- |
-| DE_TAX_ID | German Steueridentifikationsnummer (Steuer-IdNr.): unique 11-digit personal tax identification number issued by the Bundeszentralamt für Steuern. Legal basis: §§ 139a–139e AO. | Pattern match, context and checksum (ISO 7064 Mod 11, 10) |
+| DE_TAX_ID | German Steueridentifikationsnummer (Steuer-IdNr.): unique 11-digit personal tax identification number issued by the Bundeszentralamt für Steuern. Legal basis: §§ 139a–139e AO. | Pattern match, context, BZSt digit-repetition rule and checksum (ISO 7064 Mod 11, 10) |
 | DE_TAX_NUMBER | German Steuernummer: tax number assigned by the local Finanzamt, in ELSTER unified 13-digit format or state-specific slash-separated formats. Legal basis: § 139a AO. | Pattern match and context |
 | DE_PASSPORT | German Reisepassnummer: 9-character alphanumeric document number using ICAO Doc 9303 character set. Legal basis: Passgesetz (PassG) § 4. | Pattern match and context |
 | DE_ID_CARD | German Personalausweisnummer: 9-character alphanumeric document number (nPA since Nov 2010) or legacy T+8-digit format. Legal basis: Personalausweisgesetz (PAuswG). | Pattern match and context |
