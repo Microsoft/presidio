@@ -384,6 +384,19 @@ def update_iban_checksum(iban):
         ("Dalla's Pizza | 3843 Peartree Road, Bamblee, SD 20241 440-600-5124", 0, ()),
         ("AL47212110090000000235698741 ALL CAPS", 1, ((0, 28),),),
         ("CY17 0020 0128 0000 0012 0052 7601 failed", 0, (),),
+        pytest.param("AT6519043002345732017", 0, (), id="at-one-char-too-long"),
+        pytest.param("AT65 1904 3002 3457 3201 7", 0, (), id="at-spaced-one-char-too-long"),
+        pytest.param("GB90NWBK601613319268195", 0, (), id="gb-one-char-too-long"),
+        pytest.param("MU37BOMM0101101030300200000MUR0", 0, (), id="mu-one-char-too-long"),
+        pytest.param("PS06PALS0000000004001234567020", 0, (), id="ps-one-char-too-long"),
+        pytest.param("PT710002012312345678901541", 0, (), id="pt-one-char-too-long"),
+        pytest.param("QA10DOHB00001234567890ABCDEFG1", 0, (), id="qa-one-char-too-long"),
+        pytest.param("MU87BOMM0101101030300200000M", 0, (), id="mu-two-chars-too-short"),
+        pytest.param("PS76PALS00000000040012345", 0, (), id="ps-four-chars-too-short"),
+        pytest.param("PT5100020123123456789", 0, (), id="pt-four-chars-too-short"),
+        pytest.param("QA64DOHB00001234567890ABC", 0, (), id="qa-four-chars-too-short"),
+        pytest.param("pay AT6519043002345732017 today", 0, (), id="too-long-in-sentence"),
+        pytest.param("AT611904300234573201 93", 1, ((0, 20),), id="trailing-number-not-in-span"),
         # fmt: on
     ],
 )
@@ -409,9 +422,9 @@ def test_when_finditer_times_out_then_returns_empty_results(recognizer, entities
 
 
 def test_when_format_validation_times_out_then_returns_no_results(recognizer, entities):
-    """Test that a TimeoutError from re.match in __is_valid_format is caught."""
+    """Test that a TimeoutError from re.fullmatch in __is_valid_format is caught."""
     with patch(
-        "presidio_analyzer.predefined_recognizers.generic.iban_recognizer.re.match",
+        "presidio_analyzer.predefined_recognizers.generic.iban_recognizer.re.fullmatch",
         side_effect=TimeoutError("regex timed out"),
     ):
         results = recognizer.analyze("AL47212110090000000235698741", entities)

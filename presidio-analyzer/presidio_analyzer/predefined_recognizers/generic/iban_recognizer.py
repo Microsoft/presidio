@@ -229,7 +229,7 @@ class IbanRecognizer(PatternRecognizer):
             if bos_eos and country_regex:
                 country_regex = bos_eos[0] + country_regex + bos_eos[1]
             try:
-                return country_regex and re.match(
+                return country_regex and re.fullmatch(
                     country_regex, iban, flags=flags, timeout=REGEX_TIMEOUT_SECONDS
                 )
             except TimeoutError:

@@ -117,7 +117,7 @@ regex_per_country = {
     # Mauritania    (23n) MRkk bbbb bsss sscc cccc cccc cxx
     "MR": "(MR)" + CK + N4 + N4 + N4 + N4 + N4 + N3,
     # Mauritius (4a,19n,3a)   MUkk bbbb bbss cccc cccc cccc 000m mm
-    "MU": "(MU)" + CK + A4 + N4 + N4 + N4 + N4 + N3 + A,
+    "MU": "(MU)" + CK + A4 + N4 + N4 + N4 + N4 + N3 + A3,
     # Moldova   (2c,18c)  MDkk bbcc cccc cccc cccc cccc
     "MD": "(MD)" + CK + C4 + C4 + C4 + C4 + C4,
     # Monaco    (10n,11c,2n)  MCkk bbbb bsss sscc cccc cccc cxx
@@ -133,13 +133,13 @@ regex_per_country = {
     # Pakistan  (4c,16n)  PKkk bbbb cccc cccc cccc cccc
     "PK": "(PK)" + CK + C4 + N4 + N4 + N4 + N4,
     # Palestinian territories   (4c,21n)  PSkk bbbb xxxx xxxx xccc cccc cccc c
-    "PS": "(PS)" + CK + C4 + N4 + N4 + N4 + N4 + N,
+    "PS": "(PS)" + CK + C4 + N4 + N4 + N4 + N4 + N4 + N,
     # Poland    (24n) PLkk bbbs sssx cccc cccc cccc cccc
     "PL": "(PL)" + CK + N4 + N4 + N4 + N4 + N4 + N4,
     # Portugal  (21n) PTkk bbbb ssss cccc cccc cccx x
-    "PT": "(PT)" + CK + N4 + N4 + N4 + N4 + N,
+    "PT": "(PT)" + CK + N4 + N4 + N4 + N4 + N4 + N,
     # Qatar (4a,21c)  QAkk bbbb cccc cccc cccc cccc cccc c
-    "QA": "(QA)" + CK + A4 + C4 + C4 + C4 + C4 + C,
+    "QA": "(QA)" + CK + A4 + C4 + C4 + C4 + C4 + C4 + C,
     # Romania   (4a,16c)  ROkk bbbb cccc cccc cccc cccc
     "RO": "(RO)" + CK + A4 + C4 + C4 + C4 + C4,
     # San Marino    (1a,10n,12c)  SMkk xbbb bbss sssc cccc cccc ccc
