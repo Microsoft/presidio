@@ -18,9 +18,12 @@ class PlPeselRecognizer(PatternRecognizer):
     COUNTRY_CODE = "pl"
 
     PATTERNS = [
+        # The lookarounds reject 11 digits that are part of a longer number; \b
+        # would also reject a PESEL glued to a letter, as in "PESEL44051401458".
         Pattern(
             "PESEL",
-            r"[0-9]{2}([02468][1-9]|[13579][012])(0[1-9]|1[0-9]|2[0-9]|3[01])[0-9]{5}",
+            r"(?<!\d)[0-9]{2}([02468][1-9]|[13579][012])"
+            r"(0[1-9]|1[0-9]|2[0-9]|3[01])[0-9]{5}(?!\d)",
             0.4,
         ),
     ]
