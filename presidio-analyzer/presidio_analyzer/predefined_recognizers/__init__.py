@@ -10,6 +10,9 @@ from .country_specific.australia.au_acn_recognizer import AuAcnRecognizer
 from .country_specific.australia.au_medicare_recognizer import AuMedicareRecognizer
 from .country_specific.australia.au_tfn_recognizer import AuTfnRecognizer
 
+# Austria recognizers
+from .country_specific.austria.at_svnr_recognizer import AtSvnrRecognizer
+
 # Canada recognizers
 from .country_specific.canada.ca_postal_code_recognizer import CaPostalCodeRecognizer
 from .country_specific.canada.ca_sin_recognizer import CaSinRecognizer
@@ -223,6 +226,7 @@ NLP_RECOGNIZERS = {
 
 __all__ = [
     "AbaRoutingRecognizer",
+    "AtSvnrRecognizer",
     "CaPostalCodeRecognizer",
     "CaSinRecognizer",
     "CreditCardRecognizer",
