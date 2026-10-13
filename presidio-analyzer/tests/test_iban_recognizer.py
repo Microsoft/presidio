@@ -1,3 +1,4 @@
+import logging
 import re
 from unittest.mock import MagicMock, patch
 
@@ -432,3 +433,13 @@ def test_when_iban_match_group_is_empty_string_then_skips(recognizer, entities):
         results = recognizer.analyze("AL47212110090000000235698741", entities)
 
     assert results == []
+
+
+def test_when_validation_raises_then_iban_candidate_not_logged(recognizer, caplog):
+    """Test that a candidate failing checksum computation is kept out of the log."""
+    with caplog.at_level(logging.ERROR, logger="presidio-analyzer"):
+        result = recognizer.validate_result("DE89_370400440532013000")
+
+    assert result is False
+    assert any("Failed to validate" in rec.getMessage() for rec in caplog.records)
+    assert "370400440532013000" not in caplog.text

@@ -271,7 +271,9 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         context_list.extend(backward_context)
         context_list.extend(forward_context)
         context_list = list(set(context_list))
-        logger.debug("Context list is: %s", " ".join(context_list))
+        # Log only the size of the context list; its content is taken from
+        # the analyzed text and may contain PII values.
+        logger.debug("Context list contains %d words", len(context_list))
         return context_list
 
     @staticmethod

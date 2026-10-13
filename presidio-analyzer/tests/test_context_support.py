@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pytest
@@ -216,3 +217,25 @@ def test_when_context_custom_recognizer_then_succeed(spacy_nlp_engine, mock_nlp_
     assert len(results_without_context) == len(results_with_context)
     for res_wo, res_w in zip(results_without_context, results_with_context):
         assert res_wo.score < res_w.score
+
+
+def test_when_debug_logging_enabled_then_analyzed_text_stays_out_of_log(
+    spacy_nlp_engine, lemma_context, us_license_recognizer, caplog
+):
+    """This test checks that context extraction does not log the analyzed text.
+
+    The context list is built from the words surrounding a detected entity,
+    so logging its content writes PII values (e.g. names) to the log.
+    """
+    text = "John Smith license is AC432223"
+    nlp_artifacts = spacy_nlp_engine.process_text(text, "en")
+    recognizer_results = us_license_recognizer.analyze(text, nlp_artifacts)
+    assert recognizer_results
+
+    with caplog.at_level(logging.DEBUG, logger="presidio-analyzer"):
+        lemma_context.enhance_using_context(
+            text, recognizer_results, nlp_artifacts, [us_license_recognizer]
+        )
+
+    assert "john" not in caplog.text.lower()
+    assert "smith" not in caplog.text.lower()

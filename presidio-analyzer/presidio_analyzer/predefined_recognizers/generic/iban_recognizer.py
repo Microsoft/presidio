@@ -110,7 +110,11 @@ class IbanRecognizer(PatternRecognizer):
                     result = None
             return result
         except ValueError:
-            logger.error("Failed to validate text %s", pattern_text)
+            # Log only the candidate's length; the matched text is PII and
+            # must not be written to the log.
+            logger.error(
+                "Failed to validate IBAN candidate of length %d", len(pattern_text)
+            )
             return False
 
     def analyze(
