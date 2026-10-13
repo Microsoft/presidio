@@ -49,6 +49,10 @@ def entities():
         ("PESEL 44051401458", 1, ((6, 17),)),
         ("PESEL44051401458", 1, ((5, 16),)),
         ("44051401458 and 02070803628", 2, ((0, 11), (16, 27))),
+        # Valid: only a digit extends the number, so a PESEL next to a letter
+        # on either side still matches, with the letter outside the span
+        ("X44051401458", 1, ((1, 12),)),
+        ("44051401458X", 1, ((0, 11),)),
         # fmt: on
     ],
 )
