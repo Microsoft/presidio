@@ -115,3 +115,19 @@ def test_entity_not_returned_if_not_in_supported_entities(mock_nlp_artifacts):
         text="text", nlp_artifacts=mock_nlp_artifacts, entities=["DATE_TIME"]
     )
     assert len(res) == 0
+
+
+def test_custom_default_explanation_used_in_analysis_explanation(mock_nlp_artifacts):
+    custom_explanation = "Custom explanation: {} detected"
+    spacy_recognizer = SpacyRecognizer(
+        supported_entities=["PERSON"],
+        default_explanation=custom_explanation,
+    )
+    res = spacy_recognizer.analyze(
+        text="text", nlp_artifacts=mock_nlp_artifacts, entities=["PERSON"]
+    )
+    assert len(res) == 1
+    assert (
+        res[0].analysis_explanation.textual_explanation
+        == "Custom explanation: PERSON detected"
+    )
