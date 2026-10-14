@@ -23,8 +23,8 @@ class MedicalLicenseRecognizer(PatternRecognizer):
     PATTERNS = [
         Pattern(
             "USA DEA Certificate Number (weak)",
-            r"[abcdefghjklmprstuxABCDEFGHJKLMPRSTUX]{1}[a-zA-Z]{1}\d{7}|"
-            r"[abcdefghjklmprstuxABCDEFGHJKLMPRSTUX]{1}9\d{7}",
+            r"\b(?:[abcdefghjklmprstuxABCDEFGHJKLMPRSTUX]{1}[a-zA-Z]{1}\d{7}|"
+            r"[abcdefghjklmprstuxABCDEFGHJKLMPRSTUX]{1}9\d{7})\b",
             0.4,
         ),
     ]
