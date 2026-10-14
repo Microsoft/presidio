@@ -61,3 +61,30 @@ def test_run_with_ignored_path(temp_workspace):
     assert new.is_file_ignored("./dos.yml")
     assert new.is_file_ignored("./.git/hooks/README.sample")
     assert not new.is_file_ignored("notignored")
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("5", "Invalid threshold value: 5. Threshold must be between 0 and 1"),
+        ("-0.1", "Invalid threshold value: -0.1. Threshold must be between 0 and 1"),
+        (".nan", "Invalid threshold value: nan. Threshold must be between 0 and 1"),
+        ("abc", "Invalid threshold value: abc. Threshold must be a number"),
+        ("[]", "Invalid threshold value: []. Threshold must be a number"),
+        ("true", "Invalid threshold value: True. Threshold must be a number"),
+        pytest.param(
+            "1" + "0" * 400,
+            f"Invalid threshold value: 1{'0' * 400}. Threshold must be a number",
+            id="int-too-large-for-float",
+        ),
+    ],
+)
+def test_invalid_threshold_raises_config_error(value, message):
+    with pytest.raises(config.PresidioCLIConfigError) as excinfo:
+        config.PresidioCLIConfig(f"threshold: {value}\n")
+    assert str(excinfo.value) == message
+
+
+@pytest.mark.parametrize(("value", "expected"), [("0", 0.0), ("0.7", 0.7), ("1", 1.0)])
+def test_threshold_is_read_from_config(value, expected):
+    assert config.PresidioCLIConfig(f"threshold: {value}\n").threshold == expected

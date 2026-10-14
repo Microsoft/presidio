@@ -3,6 +3,11 @@ from typing import Any, Dict, List, Union
 
 from pydantic import ValidationError
 
+from presidio_analyzer.score_thresholds import (
+    normalize_score_thresholds,
+    validate_score_threshold,
+)
+
 from . import validate_language_codes
 from .yaml_recognizer_models import RecognizerRegistryConfig
 
@@ -38,11 +43,7 @@ class ConfigurationValidator:
 
         :param threshold: score threshold to validate.
         """
-        if not 0.0 <= threshold <= 1.0:
-            raise ValueError(
-                f"Score threshold must be between 0.0 and 1.0, got: {threshold}"
-            )
-        return threshold
+        return validate_score_threshold(threshold)
 
     @staticmethod
     def validate_nlp_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -80,9 +81,15 @@ class ConfigurationValidator:
         try:
             # Use Pydantic model for validation
             validated_config = RecognizerRegistryConfig(**config)
-            return ConfigurationValidator._dump_recognizer_registry_configuration(
-                validated_config
+            dumped_config = (
+                ConfigurationValidator._dump_recognizer_registry_configuration(
+                    validated_config
+                )
             )
+            for recognizer in dumped_config["recognizers"]:
+                if isinstance(recognizer, dict):
+                    normalize_score_thresholds(recognizer.get("score_thresholds"))
+            return dumped_config
         except ValidationError as e:
             raise ValueError("Invalid recognizer registry configuration") from e
 

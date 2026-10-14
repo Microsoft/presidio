@@ -31,8 +31,8 @@ def test_given_anonymize_called_with_valid_request_then_expected_valid_response_
     {
         "text": "hello world, my name is ANONYMIZED. My number is: 03445****", 
         "items": [
-            {"operator": "mask", "entity_type": "PHONE_NUMBER", "start": 50, "end": 59, "text":"03445****"}, 
-            {"operator": "replace", "entity_type": "NAME", "start": 24, "end": 34, "text":"ANONYMIZED"}
+            {"operator": "mask", "entity_type": "PHONE_NUMBER", "start": 50, "end": 59, "text":"03445****", "score": 0.95}, 
+            {"operator": "replace", "entity_type": "NAME", "start": 24, "end": 34, "text":"ANONYMIZED", "score": 0.8}
         ]
     }
     """
@@ -146,7 +146,7 @@ def test_given_decrypt_called_with_encrypted_text_then_decrypted_text_returned()
 
     response_status, response_content = deanonymize(json.dumps(request_body))
 
-    expected_response = """{"text": "text_for_encryption", "items": [{"start": 0, "end": 19, "operator":"decrypt", "text": "text_for_encryption","entity_type":"NUMBER"}]}"""
+    expected_response = """{"text": "text_for_encryption", "items": [{"start": 0, "end": 19, "operator":"decrypt", "text": "text_for_encryption","entity_type":"NUMBER", "score": null}]}"""
 
     assert response_status == 200
     assert equal_json_strings(expected_response, response_content)
@@ -298,8 +298,8 @@ def test_keep_name():
     {
         "text": "hello world, my name is Jane Doe. My number is: <PHONE_NUMBER>", 
         "items": [
-            {"operator": "replace", "entity_type": "PHONE_NUMBER", "start": 48, "end": 62, "text":"<PHONE_NUMBER>"}, 
-            {"operator": "keep", "entity_type": "NAME", "start": 24, "end": 32, "text":"Jane Doe"}
+            {"operator": "replace", "entity_type": "PHONE_NUMBER", "start": 48, "end": 62, "text":"<PHONE_NUMBER>", "score": 0.95}, 
+            {"operator": "keep", "entity_type": "NAME", "start": 24, "end": 32, "text":"Jane Doe", "score": 0.8}
         ]
     }
     """
@@ -330,8 +330,8 @@ def test_overlapping_keep_first():
     {
         "text": "I'm George Washington<LOCATION>", 
         "items": [
-            {"operator": "replace", "entity_type": "LOCATION", "start": 21, "end": 31, "text":"<LOCATION>"}, 
-            {"operator": "keep", "entity_type": "NAME", "start": 4, "end": 21, "text":"George Washington"}
+            {"operator": "replace", "entity_type": "LOCATION", "start": 21, "end": 31, "text":"<LOCATION>", "score": 0.8}, 
+            {"operator": "keep", "entity_type": "NAME", "start": 4, "end": 21, "text":"George Washington", "score": 0.8}
         ]
     }
     """
@@ -362,8 +362,8 @@ def test_overlapping_keep_second():
     {
         "text": "I'm <NAME>Washington Square Park", 
         "items": [
-            {"operator": "keep", "entity_type": "LOCATION", "start": 10, "end": 32, "text":"Washington Square Park"}, 
-            {"operator": "replace", "entity_type": "NAME", "start": 4, "end": 10, "text":"<NAME>"}
+            {"operator": "keep", "entity_type": "LOCATION", "start": 10, "end": 32, "text":"Washington Square Park", "score": 0.8}, 
+            {"operator": "replace", "entity_type": "NAME", "start": 4, "end": 10, "text":"<NAME>", "score": 0.8}
         ]
     }
     """
@@ -393,8 +393,8 @@ def test_overlapping_keep_both():
     {
         "text": "I'm George WashingtonWashington Square Park", 
         "items": [
-            {"operator": "keep", "entity_type": "LOCATION", "start": 21, "end": 43, "text":"Washington Square Park"}, 
-            {"operator": "keep", "entity_type": "NAME", "start": 4, "end": 21, "text":"George Washington"}
+            {"operator": "keep", "entity_type": "LOCATION", "start": 21, "end": 43, "text":"Washington Square Park", "score": 0.8}, 
+            {"operator": "keep", "entity_type": "NAME", "start": 4, "end": 21, "text":"George Washington", "score": 0.8}
         ]
     }
     """

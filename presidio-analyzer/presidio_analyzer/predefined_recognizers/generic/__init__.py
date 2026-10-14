@@ -8,6 +8,7 @@ from .ip_recognizer import IpRecognizer
 from .mac_recognizer import MacAddressRecognizer
 from .phone_recognizer import PhoneRecognizer
 from .url_recognizer import UrlRecognizer
+from .uuid_recognizer import UuidRecognizer
 
 __all__ = [
     "CreditCardRecognizer",
@@ -18,4 +19,5 @@ __all__ = [
     "PhoneRecognizer",
     "UrlRecognizer",
     "MacAddressRecognizer",
+    "UuidRecognizer",
 ]

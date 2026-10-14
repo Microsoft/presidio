@@ -1,3 +1,5 @@
+# ruff: noqa: D103,D200,D205,E501,F841,I001
+
 import pytest
 import re
 from pathlib import Path
@@ -38,6 +40,122 @@ def test_recognizer_registry_provider_configuration_file():
     assert [recognizer.supported_language for recognizer in recognizer_registry.recognizers if recognizer.name == "ExampleCustomRecognizer"] == ["en", "es"]
     spanish_recognizer = [recognizer for recognizer in recognizer_registry.recognizers if recognizer.name == "ExampleCustomRecognizer" and recognizer.supported_language == "es"][0]
     assert spanish_recognizer.context == ["tarjeta", "credito"]
+    credit_card = next(
+        recognizer
+        for recognizer in recognizer_registry.recognizers
+        if recognizer.name == "CreditCardRecognizer"
+    )
+    assert credit_card.score_thresholds == {
+        "default": 0.4,
+        "CREDIT_CARD": 0.8,
+    }
+    assert all(
+        recognizer.score_thresholds == {"ZIP": 0.6}
+        for recognizer in recognizer_registry.recognizers
+        if recognizer.name == "ExampleCustomRecognizer"
+    )
+
+
+def test_recognizer_registry_provider_inline_thresholds_attach_to_instance():
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "CreditCardRecognizer",
+                    "type": "predefined",
+                    "supported_language": "en",
+                    "score_thresholds": {"default": 0.4},
+                }
+            ],
+        }
+    )
+
+    recognizer = provider.create_recognizer_registry().recognizers[0]
+
+    assert recognizer.score_thresholds == {"default": 0.4}
+
+
+def test_recognizer_registry_provider_omitted_deny_list_score_defaults_to_one():
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "Titles",
+                    "supported_entity": "TITLE",
+                    "deny_list": ["Mr.", "Mrs."],
+                }
+            ],
+        }
+    )
+
+    recognizer = provider.create_recognizer_registry().recognizers[0]
+
+    assert recognizer.deny_list_score == 1.0
+    assert all(pattern.score == 1.0 for pattern in recognizer.patterns)
+
+
+def test_recognizer_registry_provider_explicit_deny_list_score_is_honored():
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "Titles",
+                    "supported_entity": "TITLE",
+                    "deny_list": ["Mr.", "Mrs."],
+                    "deny_list_score": 0.3,
+                }
+            ],
+        }
+    )
+
+    recognizer = provider.create_recognizer_registry().recognizers[0]
+
+    assert recognizer.deny_list_score == 0.3
+    assert all(pattern.score == 0.3 for pattern in recognizer.patterns)
+
+
+def test_recognizer_registry_provider_omitted_thresholds_default_to_empty():
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "CreditCardRecognizer",
+                    "type": "predefined",
+                    "supported_language": "en",
+                }
+            ],
+        }
+    )
+
+    recognizer = provider.create_recognizer_registry().recognizers[0]
+
+    assert recognizer.score_thresholds == {}
+
+
+@pytest.mark.parametrize(
+    "score_thresholds",
+    [True, False, 0, "", "0.4", [], {"": 0.4}, {"default": True}, {"default": 1.1}],
+)
+def test_recognizer_registry_provider_rejects_invalid_score_thresholds(
+    score_thresholds,
+):
+    with pytest.raises(ValueError):
+        RecognizerRegistryProvider(
+            registry_configuration={
+                "supported_languages": ["en"],
+                "recognizers": [
+                    {
+                        "name": "CreditCardRecognizer",
+                        "type": "predefined",
+                        "score_thresholds": score_thresholds,
+                    }
+                ],
+            }
+        )
 
 
 def test_recognizer_registry_provider_configuration_file_load_predefined(mandatory_recognizers):
@@ -242,3 +360,94 @@ def test_direct_validation_with_missing_global_regex_flags():
     # Verify default value and successful creation
     assert validated["global_regex_flags"] == 26
     assert validated["supported_languages"] == ["en"]
+
+
+def test_recognizer_registry_provider_yaml_character_chunker_config():
+    """Test that text_chunker dict with character chunker is passed from YAML."""
+    this_path = Path(__file__).parent.absolute()
+    test_yaml = Path(this_path, "conf/test_hf_recognizer_with_chunker.yaml")
+    provider = RecognizerRegistryProvider(conf_file=test_yaml)
+    registry = provider.create_recognizer_registry()
+
+    from presidio_analyzer.predefined_recognizers.ner import HuggingFaceNerRecognizer
+    from presidio_analyzer.chunkers import CharacterBasedTextChunker
+
+    hf_recognizers = [
+        r for r in registry.recognizers
+        if isinstance(r, HuggingFaceNerRecognizer)
+    ]
+    assert len(hf_recognizers) == 1
+
+    recognizer = hf_recognizers[0]
+    assert isinstance(recognizer.text_chunker, CharacterBasedTextChunker)
+    assert recognizer.text_chunker.chunk_size == 300
+    assert recognizer.text_chunker.chunk_overlap == 40
+
+
+def test_recognizer_registry_provider_tokenizer_chunker_config():
+    """Test that text_chunker with tokenizer type creates TokenizerBasedTextChunker."""
+    from unittest.mock import MagicMock
+    from presidio_analyzer.predefined_recognizers.ner import HuggingFaceNerRecognizer
+    from presidio_analyzer.chunkers import TokenizerBasedTextChunker
+
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.model_max_length = 512
+    mock_tokenizer.num_special_tokens_to_add = lambda pair=False: 0
+
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "global_regex_flags": 26,
+            "recognizers": [
+                {
+                    "name": "HF NER",
+                    "type": "predefined",
+                    "class_name": "HuggingFaceNerRecognizer",
+                    "model_name": "dslim/bert-base-NER",
+                    "supported_languages": ["en"],
+                    "supported_entities": ["PERSON"],
+                    "device": "cpu",
+                    "text_chunker": {
+                        "chunker_type": "tokenizer",
+                        "tokenizer": mock_tokenizer,
+                        "max_tokens": 256,
+                        "overlap_tokens": 16,
+                    },
+                }
+            ],
+        }
+    )
+    registry = provider.create_recognizer_registry()
+
+    hf_recognizers = [
+        r for r in registry.recognizers
+        if isinstance(r, HuggingFaceNerRecognizer)
+    ]
+    assert len(hf_recognizers) == 1
+
+    recognizer = hf_recognizers[0]
+    assert isinstance(recognizer.text_chunker, TokenizerBasedTextChunker)
+    assert recognizer.text_chunker.max_tokens == 256
+    assert recognizer.text_chunker.overlap_tokens == 16
+
+
+def test_text_chunker_config_rejects_tokenizer_params_for_character():
+    """Character chunker_type must not accept tokenizer-only params."""
+    from pydantic import ValidationError
+    from presidio_analyzer.input_validation.yaml_recognizer_models import (
+        TextChunkerConfig,
+    )
+
+    with pytest.raises(ValidationError, match="chunker_type='character'"):
+        TextChunkerConfig(chunker_type="character", max_tokens=256)
+
+
+def test_text_chunker_config_rejects_character_params_for_tokenizer():
+    """Tokenizer chunker_type must not accept character-only params."""
+    from pydantic import ValidationError
+    from presidio_analyzer.input_validation.yaml_recognizer_models import (
+        TextChunkerConfig,
+    )
+
+    with pytest.raises(ValidationError, match="chunker_type='tokenizer'"):
+        TextChunkerConfig(chunker_type="tokenizer", chunk_size=300)

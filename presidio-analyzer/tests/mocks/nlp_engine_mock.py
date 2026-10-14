@@ -1,6 +1,6 @@
-from typing import Iterable, Iterator, Tuple, Dict, List
+from typing import Dict, Iterable, Iterator, List, Tuple
 
-from presidio_analyzer.nlp_engine import NlpEngine, NlpArtifacts
+from presidio_analyzer.nlp_engine import NlpArtifacts, NlpEngine
 
 
 class NlpEngineMock(NlpEngine):

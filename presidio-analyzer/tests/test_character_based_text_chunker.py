@@ -76,6 +76,25 @@ class TestCharacterBasedTextChunkerChunk:
         for chunk in chunks:
             assert text[chunk.start:chunk.end] == chunk.text
 
+    def test_chunk_start_lands_on_word_boundary(self):
+        """Test that every chunk after the first begins on a word boundary."""
+        chunker = CharacterBasedTextChunker(chunk_size=10, chunk_overlap=3)
+        text = "This is a test string for chunking purposes"
+        chunks = chunker.chunk(text)
+
+        assert len(chunks) > 1, "test needs multiple chunks to exercise the bug"
+        for chunk in chunks[1:]:
+            # "mid-word" means both neighbours of `start` are non-boundary chars
+            # (start sits strictly between two letters of the same word). A
+            # start landing ON a boundary char, or right after one, is fine.
+            before_is_boundary = (
+                chunk.start == 0 or text[chunk.start - 1] in chunker.boundary_chars
+            )
+            at_is_boundary = text[chunk.start] in chunker.boundary_chars
+            assert before_is_boundary or at_is_boundary, (
+                f"chunk starting at {chunk.start} begins mid-word: {chunk.text[:20]!r}"
+            )
+
 
 class TestCharacterBasedTextChunkerEdgeCases:
     """Edge case tests for CharacterBasedTextChunker."""

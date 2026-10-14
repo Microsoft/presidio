@@ -25,12 +25,12 @@ The AHDS de-identification service integration provides two main capabilities:
 
 ### For AHDS Recognizer
 ```bash
-pip install presidio-analyzer[ahds]
+pip install "presidio-analyzer[ahds]"
 ```
 
 ### For AHDS Surrogate Operator
 ```bash
-pip install presidio-anonymizer[ahds]
+pip install "presidio-anonymizer[ahds]"
 ```
 
 ## Prerequisites
@@ -169,7 +169,7 @@ For production deployments, we recommend:
 
 1. **ModuleNotFoundError**: Install the AHDS optional dependencies
    ```bash
-   pip install presidio-analyzer[ahds] presidio-anonymizer[ahds]
+   pip install "presidio-analyzer[ahds]" "presidio-anonymizer[ahds]"
    ```
 
 2. **Authentication errors**: Ensure Azure credentials are properly configured

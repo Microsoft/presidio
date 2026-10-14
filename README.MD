@@ -1,5 +1,5 @@
 # Presidio - Data Protection and De-identification SDK
-## :mega: Presidio is moving to a new home! [Read more here](docs/project_transition.md) :mega:
+## :mega: Presidio has moved to a new home! [Read more here](docs/project_transition.md) :mega:
 **Context aware, pluggable and customizable PII de-identification service for text and images.**
 
 ---

@@ -23,7 +23,10 @@ def entities():
         ("hh 01 02 03 d", 1, ((0, 13),), ((0.5, 0.5),), ),
         ("tw987654a", 1, ((0, 9),), ((0.5, 0.5),), ),
         ("nino: PR 123612C", 1, ((6, 16),), ((0.5, 0.5),), ),
-        ("Here is my National Insurance Number YZ 61 48 68 B", 1, ((36, 50),), ((0.5, 0.5),), ),
+        ("Here is my National Insurance Number YZ 61 48 68 B", 1, ((37, 50),), ((0.5, 0.5),), ),
+        # The span starts at the NINO, never at a preceding space.
+        ("my AB123456C", 1, ((3, 12),), ((0.5, 0.5),), ),
+        ("contact AB 12 34 56 C now", 1, ((8, 21),), ((0.5, 0.5),), ),
         # Invalid National Insurance Numbers
         ("AA 12 34 56 H", 0, (), (), ),
         # The suffix must be a letter A-D; a numeric suffix is never valid.
@@ -31,6 +34,9 @@ def entities():
         ("ab1234561", 0, (), (), ),
         ("FQ 00 00 00 C", 0, (), (), ),
         ("BG123612A", 0, (), (), ),
+        # Excluded prefixes must stay excluded when the NINO follows a word.
+        ("my BG123612A", 0, (), (), ),
+        ("nino BG 12 36 12 A", 0, (), (), ),
         ("nino: nt 99 88 77 a", 0, (), (), ),
         ("This isn't a valid national insurance number UV 98 76 54 B", 0, (), (), ),
         # fmt: on

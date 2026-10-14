@@ -40,6 +40,8 @@ class GLiNERRecognizer(LocalRecognizer):
         threshold: float = 0.30,
         map_location: Optional[str] = None,
         text_chunker: Optional[BaseTextChunker] = None,
+        chunk_size: int = 250,
+        chunk_overlap: int = 50,
         load_onnx_model: bool = False,
         onnx_model_file: str = "model.onnx",
         **model_kwargs,
@@ -63,9 +65,13 @@ class GLiNERRecognizer(LocalRecognizer):
         (see GLiNER's documentation)
         :param map_location: The device to use for the model.
             If None, will auto-detect GPU or use CPU.
-        :param text_chunker: Custom text chunking strategy. If None, uses
-            CharacterBasedTextChunker with default settings (chunk_size=250,
-            chunk_overlap=50)
+        :param text_chunker: Text chunking strategy. Accepts a BaseTextChunker
+            instance. If None, uses CharacterBasedTextChunker with provided
+            chunk_size and chunk_overlap. When loaded from YAML, the registry
+            loader converts the ``text_chunker`` dict to a chunker instance
+            automatically.
+        :param chunk_size: Maximum number of characters per chunk.
+        :param chunk_overlap: Number of characters to overlap between chunks.
         :param load_onnx_model: Whether to load the model using ONNX Runtime.
             If True, uses ONNX Runtime backend which supports CPUs without AVX2.
             Requires onnxruntime to be installed. Default is False.
@@ -106,9 +112,7 @@ class GLiNERRecognizer(LocalRecognizer):
         self.model_name = model_name
 
         self.map_location = (
-            map_location
-            if map_location is not None
-            else device_detector.get_device()
+            map_location if map_location is not None else device_detector.get_device()
         )
 
         self.flat_ner = flat_ner
@@ -118,15 +122,15 @@ class GLiNERRecognizer(LocalRecognizer):
         self.onnx_model_file = onnx_model_file
         self.model_kwargs = model_kwargs
 
-        # Use provided chunker or default to in-house character-based chunker
+        # Initialize text chunker (instance or default)
         if text_chunker is not None:
             self.text_chunker = text_chunker
         else:
             from presidio_analyzer.chunkers import CharacterBasedTextChunker
 
             self.text_chunker = CharacterBasedTextChunker(
-                chunk_size=250,
-                chunk_overlap=50,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
             )
 
         self.gliner = None
@@ -153,6 +157,16 @@ class GLiNERRecognizer(LocalRecognizer):
             onnx_model_file=self.onnx_model_file,
             **self.model_kwargs,
         )
+
+        # Resolve deferred tokenizer chunker using the model's own tokenizer
+        from presidio_analyzer.chunkers import TokenizerBasedTextChunker
+
+        if (
+            isinstance(self.text_chunker, TokenizerBasedTextChunker)
+            and self.text_chunker.is_deferred
+        ):
+            tokenizer = self.gliner.data_processor.transformer_tokenizer
+            self.text_chunker.resolve(tokenizer)
 
     def analyze(
         self,

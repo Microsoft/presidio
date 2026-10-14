@@ -4,7 +4,7 @@ requires = ["poetry-core"]
 
 [project]
 name = "presidio_anonymizer"
-version = "2.2.363"
+version = "2.2.364"
 description = "Presidio Anonymizer package - replaces analyzed text with desired values."
 authors = [{name = "Presidio", email = "presidio@dataprivacystack.org"}]
 license = "MIT"
@@ -23,7 +23,7 @@ readme = "README.md"
 
 requires-python = ">=3.10,<3.15"
 dependencies = [
-    "cryptography (>=48.0.1,<49.0.0)"
+    "cryptography (>=50.0.0,<51.0.0)"
 ]
 
 [project.optional-dependencies]

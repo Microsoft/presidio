@@ -18,6 +18,12 @@ class KrPassportRecognizer(PatternRecognizer):
     the previous passport number format:
         - one letter 'M' or 'm' or 'S' or 's' or 'R' or 'r' or 'O' or 'o' or 'D' or 'd'
         - eight digits
+
+    :param patterns: List of patterns to be used by this recognizer
+    :param context: List of context words to increase confidence in detection
+    :param supported_language: Language this recognizer supports
+    :param supported_entity: The entity this recognizer can detect
+    :param name: Name of the recognizer
     """
 
     COUNTRY_CODE = "kr"
@@ -48,8 +54,9 @@ class KrPassportRecognizer(PatternRecognizer):
         self,
         patterns: Optional[List[Pattern]] = None,
         context: Optional[List[str]] = None,
-        supported_language: str = "kr",
+        supported_language: str = "ko",
         supported_entity: str = "KR_PASSPORT",
+        name: Optional[str] = None,
     ):
         patterns = patterns if patterns else self.PATTERNS
         context = context if context else self.CONTEXT
@@ -58,4 +65,5 @@ class KrPassportRecognizer(PatternRecognizer):
             patterns=patterns,
             context=context,
             supported_language=supported_language,
+            name=name,
         )

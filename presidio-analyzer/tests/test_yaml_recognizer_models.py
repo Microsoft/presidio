@@ -1,4 +1,5 @@
 """Tests for YAML recognizer configuration models."""
+# ruff: noqa: D103,E501,F841,I001
 
 import pytest
 from presidio_analyzer.input_validation.yaml_recognizer_models import (
@@ -380,6 +381,33 @@ def test_custom_recognizer_config_with_deny_list():
     )
     assert config.deny_list == ["exclude", "this"]
     assert config.deny_list_score == 0.1
+
+
+def test_custom_recognizer_config_omitted_deny_list_score_defaults_to_one():
+    """Omitted deny_list_score should match PatternRecognizer's own default (1.0).
+
+    PatternRecognizer.from_dict() forwards model_dump() output straight to the
+    constructor, so the dumped value has to already be 1.0 for an omitted
+    YAML field to behave the same as constructing PatternRecognizer directly.
+    """
+    config = CustomRecognizerConfig(
+        name="custom_test",
+        supported_entity="CUSTOM_ENTITY",
+        deny_list=["exclude", "this"],
+    )
+    assert config.deny_list_score == 1.0
+    assert config.model_dump()["deny_list_score"] == 1.0
+
+
+def test_custom_recognizer_config_explicit_deny_list_score_kept_in_dump():
+    """An explicitly set deny_list_score is preserved through model_dump()."""
+    config = CustomRecognizerConfig(
+        name="custom_test",
+        supported_entity="CUSTOM_ENTITY",
+        deny_list=["exclude", "this"],
+        deny_list_score=0.1,
+    )
+    assert config.model_dump()["deny_list_score"] == 0.1
 
 
 def test_custom_recognizer_config_invalid_patterns_not_list():
@@ -917,3 +945,71 @@ def test_config_model_map_fallback_to_predefined():
     assert isinstance(recognizer, PredefinedRecognizerConfig)
     assert recognizer.name == "MySpacy"
     assert recognizer.class_name == "SpacyRecognizer"
+
+
+@pytest.mark.parametrize(
+    "raw_thresholds",
+    [True, "0.4", ["default", 0.4], {"default": "0.4"}, {"default": 0.4}],
+)
+def test_base_recognizer_score_thresholds_preserve_raw_values(raw_thresholds):
+    config = BaseRecognizerConfig(
+        name="CreditCardRecognizer", score_thresholds=raw_thresholds
+    )
+
+    assert config.model_dump()["score_thresholds"] == raw_thresholds
+    assert type(config.model_dump()["score_thresholds"]) is type(raw_thresholds)
+
+
+@pytest.mark.parametrize(
+    "recognizer",
+    [
+        {
+            "name": "CreditCardRecognizer",
+            "type": "predefined",
+            "score_thresholds": {"default": 0.4},
+        },
+        {
+            "name": "custom_thresholds",
+            "type": "custom",
+            "supported_entity": "CUSTOM",
+            "supported_language": "en",
+            "patterns": [{"name": "custom", "regex": "x", "score": 0.5}],
+            "score_thresholds": {"CUSTOM": 0.6},
+        },
+        {
+            "name": "HuggingFaceNerRecognizer",
+            "type": "predefined",
+            "supported_language": "en",
+            "score_thresholds": {"PERSON": 0.7},
+        },
+        {
+            "name": "GLiNERRecognizer",
+            "type": "predefined",
+            "supported_language": "en",
+            "score_thresholds": {"PERSON": 0.8},
+        },
+    ],
+)
+def test_registry_model_dump_preserves_score_thresholds_for_every_entry_type(
+    recognizer,
+):
+    original = recognizer["score_thresholds"].copy()
+
+    dumped = RecognizerRegistryConfig(recognizers=[recognizer]).model_dump()
+
+    assert dumped["recognizers"][0]["score_thresholds"] == original
+
+
+def test_registry_model_does_not_mutate_recognizer_input_when_inferring_type():
+    recognizer = {
+        "name": "custom_thresholds",
+        "supported_entity": "CUSTOM",
+        "supported_language": "en",
+        "patterns": [{"name": "custom", "regex": "x", "score": 0.5}],
+        "score_thresholds": {"default": 0.4},
+    }
+    original = recognizer.copy()
+
+    RecognizerRegistryConfig(recognizers=[recognizer])
+
+    assert recognizer == original

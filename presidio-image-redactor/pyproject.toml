@@ -4,7 +4,7 @@ requires = ["poetry-core"]
 
 [project]
 name = "presidio-image-redactor"
-version = "0.0.59"
+version = "0.0.60"
 description = "Presidio image redactor package"
 authors = [{name = "Presidio", email = "presidio@dataprivacystack.org"}]
 license = "MIT"
@@ -23,7 +23,7 @@ readme = "README.md"
 requires-python = ">=3.10,<3.15"
 
 dependencies = [
-    "pillow (>=9.0.0,<13.0.0)",
+    "pillow>=12.3.0,<13.0.0",
     "pytesseract (>=0.3.13,<0.4)",
     "presidio-analyzer (>=2.2.0,<3.0.0)",
     "matplotlib (>=3.6.0,<4.0.0)",

@@ -24,11 +24,9 @@ By submitting a contribution, you represent that you have the legal right to con
 
 Commit message should be clear, explaining the committed changes.
 
-Update CHANGELOG.md:
-
-Under Unreleased section, use the category which is most suitable for your change (changed/removed/deprecated).
-Document the change with simple readable text and push it as part of the commit.
-Next release, the change will be documented under the new version.
+Do not update `CHANGELOG.md` as part of your PR. Before each version bump, the
+changelog entries for the current release are generated from merged PRs.
+Per-PR changelog edits create unnecessary merge conflicts with other contributions.
 
 ## Getting started with the code
 

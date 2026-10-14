@@ -119,5 +119,8 @@ class CharacterBasedTextChunker(BaseTextChunker):
                 break
             start = end - self._chunk_overlap
 
+            while start < end and text[start] not in self._boundary_chars:
+                start += 1
+
         logger.debug("Created %d chunks from text", len(chunks))
         return chunks

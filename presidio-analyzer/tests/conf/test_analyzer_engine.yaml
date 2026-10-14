@@ -6,6 +6,9 @@ recognizer_registry:
       - en
       supported_entity: CREDIT_CARD
       type: predefined
+      score_thresholds:
+        default: 0.4
+        CREDIT_CARD: 0.7
 
     - name: ItFiscalCodeRecognizer
       type: predefined
