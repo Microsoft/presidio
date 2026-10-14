@@ -1,7 +1,11 @@
 import pytest
 
-from tests import assert_result
+from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.predefined_recognizers import SgUenRecognizer
+from presidio_analyzer.recognizer_registry import RecognizerRegistryProvider
+
+from tests import assert_result
+from tests.mocks import NlpEngineMock
 
 
 @pytest.fixture(scope="module")
@@ -53,3 +57,33 @@ def test_when_all_sg_uens_then_succeed(
     assert len(results) == expected_len
     for res, (st_pos, fn_pos) in zip(results, expected_positions):
         assert_result(res, entities[0], st_pos, fn_pos, max_score)
+
+
+def test_when_format_c_uen_has_non_ascii_digit_then_no_result_and_no_error(
+    recognizer, entities
+):
+    """A fullwidth digit matches the pattern but has no checksum value."""
+    assert recognizer.analyze("T\uff186RF0037C", entities) == []
+
+
+def test_when_enabled_in_configuration_then_non_ascii_digit_does_not_stop_analysis():
+    """Loaded from configuration, the UEN after the malformed one is still found."""
+    registry = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "SgUenRecognizer",
+                    "type": "predefined",
+                    "supported_languages": ["en"],
+                    "enabled": True,
+                    "country_code": "sg",
+                }
+            ],
+        }
+    ).create_recognizer_registry()
+    analyzer = AnalyzerEngine(registry=registry, nlp_engine=NlpEngineMock())
+
+    results = analyzer.analyze("UEN T\uff186RF0037C or T16RF0037C", language="en")
+
+    assert [(r.entity_type, r.start, r.score) for r in results] == [("SG_UEN", 18, 1.0)]

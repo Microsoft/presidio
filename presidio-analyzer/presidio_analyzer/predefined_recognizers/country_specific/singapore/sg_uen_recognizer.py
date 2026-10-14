@@ -184,6 +184,10 @@ class SgUenRecognizer(PatternRecognizer):
         if entity_type not in SgUenRecognizer.UEN_FORMAT_C_ENTITY_TYPE:
             return False
 
+        # The pattern's \d also matches non-ASCII digits, which are not in the alphabet.
+        if any(n not in SgUenRecognizer.UEN_FORMAT_C_ALPHABET for n in uen[:-1]):
+            return False
+
         weighted_sum = sum(
             SgUenRecognizer.UEN_FORMAT_C_ALPHABET.index(n) * w
             for n, w in zip(uen[:-1], SgUenRecognizer.UEN_FORMAT_C_WEIGHT)

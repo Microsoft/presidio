@@ -104,6 +104,11 @@ class ItFiscalCodeRecognizer(PatternRecognizer):
             "Z": 23,
         }
 
+        # The pattern's \d and case-insensitive [A-Z] also match non-ASCII
+        # characters (fullwidth digits, the Kelvin sign) that have no checksum value.
+        if any(char not in map_odd for char in text_to_validate):
+            return False
+
         odd_sum = 0
         for char in odd_values:
             odd_sum += map_odd[char]
