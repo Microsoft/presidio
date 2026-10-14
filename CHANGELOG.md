@@ -128,7 +128,6 @@ All notable changes to this project will be documented in this file.
 ### Image Redactor
 #### Added
 - Added Azure SDK credential support to `DocumentIntelligenceOCR` so callers can use Azure Identity credentials instead of API keys (#2085) (Thanks @mturac)
-- Multi-frame DICOM redaction support in `DicomImageRedactorEngine`. PII is now detected and redacted on every frame of a multi-frame instance (`NumberOfFrames > 1`), rather than only the first frame. Byte-identical frames (e.g., static lead-in or padding frames in cine loops) are analyzed once and reuse their detection results, so OCR cost scales with the number of distinct frames. This also resolves the `ValueError: Too many dimensions: 3 > 2` raised when redacting multi-frame (e.g., XA) grayscale instances (#2094). Fixes #1737, #1731.
 
 #### Changed
 - Updated image-redactor dependencies for `opencv-python`, `gunicorn`, `pytesseract`, and `azure-ai-formrecognizer` (#1978, #1977, #1980, #1986) (Thanks @dependabot)
