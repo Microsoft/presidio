@@ -105,11 +105,17 @@ class BaseTextChunker(ABC):
     ) -> List["RecognizerResult"]:
         """Remove duplicate entities from overlapping chunks.
 
+        The highest-scoring prediction is kept, widened to cover the spans of
+        the duplicates it absorbs, so an entity that one chunk saw only
+        partially is not cut back to the partial span.
+
         :param predictions: List of RecognizerResult objects
         :param overlap_threshold: Overlap ratio threshold to consider duplicates
             (default: 0.5)
         :return: Deduplicated list of RecognizerResult sorted by position
         """
+        from presidio_analyzer import RecognizerResult
+
         if not predictions:
             return predictions
 
@@ -119,7 +125,7 @@ class BaseTextChunker(ABC):
 
         for pred in sorted_preds:
             is_duplicate = False
-            for kept in unique:
+            for i, kept in enumerate(unique):
                 # Check if same entity type and overlapping positions
                 if pred.entity_type == kept.entity_type:
                     overlap_start = max(pred.start, kept.start)
@@ -137,6 +143,15 @@ class BaseTextChunker(ABC):
                         # Check if overlap exceeds threshold
                         if overlap_len / min(pred_len, kept_len) > overlap_threshold:
                             is_duplicate = True
+                            if pred.start < kept.start or pred.end > kept.end:
+                                unique[i] = RecognizerResult(
+                                    entity_type=kept.entity_type,
+                                    start=min(pred.start, kept.start),
+                                    end=max(pred.end, kept.end),
+                                    score=kept.score,
+                                    analysis_explanation=kept.analysis_explanation,
+                                    recognition_metadata=kept.recognition_metadata,
+                                )
                             break
 
             if not is_duplicate:

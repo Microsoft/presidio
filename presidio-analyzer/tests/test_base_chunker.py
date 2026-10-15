@@ -68,6 +68,31 @@ class TestDeduplicateOverlappingEntities:
 
         assert len(result) == 1
 
+    def test_duplicate_keeps_full_span_of_partial_higher_score(self):
+        """A higher-scoring partial match must not cut away the rest of the entity."""
+        chunker = CharacterBasedTextChunker(chunk_size=38, chunk_overlap=10)
+        text = "The contact person for this case is John Smith from accounting."
+
+        def predict_func(chunk):
+            # The first chunk ends after "John", so it only sees the first name
+            if chunk.endswith("John"):
+                idx = chunk.index("John")
+                return [
+                    RecognizerResult(entity_type="PERSON", start=idx, end=idx + 4, score=0.92)
+                ]
+            if "John Smith" in chunk:
+                idx = chunk.index("John Smith")
+                return [
+                    RecognizerResult(entity_type="PERSON", start=idx, end=idx + 10, score=0.88)
+                ]
+            return []
+
+        result = chunker.predict_with_chunking(text, predict_func)
+
+        assert len(result) == 1
+        assert text[result[0].start : result[0].end] == "John Smith"
+        assert result[0].score == 0.92
+
     def test_different_types_not_deduplicated(self):
         """Overlapping entities of different types are kept."""
         chunker = CharacterBasedTextChunker()
