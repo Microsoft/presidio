@@ -318,6 +318,7 @@ def _korean_recognizer():
 
 
 def test_when_lemma_splits_korean_context_word_then_token_text_finds_it():
+    """Test that token text finds a context word the Korean lemma splits."""
     nlp_artifacts = _korean_nlp_artifacts()
     recognizer = _korean_recognizer()
     text = nlp_artifacts.tokens.text
@@ -337,6 +338,7 @@ def test_when_lemma_splits_korean_context_word_then_token_text_finds_it():
 
 
 def test_when_language_not_in_token_text_languages_then_lemmas_are_used():
+    """Test that languages not listed in token_text_languages keep using lemmas."""
     doc = spacy.blank("en")("credit cards 4111111111111111")
     lemmas = ["credit", "card", "4111111111111111"]
     nlp_artifacts = NlpArtifacts(
@@ -367,6 +369,7 @@ def test_when_language_not_in_token_text_languages_then_lemmas_are_used():
 
 
 def test_when_token_text_is_used_then_nlp_artifacts_are_not_modified():
+    """Test that the token-text swap leaves the caller's NLP artifacts unchanged."""
     nlp_artifacts = _korean_nlp_artifacts()
     recognizer = _korean_recognizer()
     text = nlp_artifacts.tokens.text
