@@ -151,7 +151,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
 | ZA_ID_NUMBER | The South African identity number is a 13-digit identifier in the `YYMMDDSSSSCAZ` format, where the trailing digit is validated with the Luhn algorithm. | Pattern match, context, and checksum. |
 | ZA_PASSPORT | The South African passport number is a 9-character identifier with prefix letter A, D, M, or T followed by 8 digits. | Pattern match, context, and validation. |
-| ZA_INCOME_TAX_NUMBER | The South African SARS income tax reference number is a 10-digit numeric identifier, commonly starting with 0, 1, 2, 3, or 9. | Pattern match, context, and validation. |
+| ZA_INCOME_TAX_NUMBER | The South African SARS income tax reference number is a 10-digit numeric identifier, commonly starting with 0, 1, 2, 3, or 9, where the trailing digit is validated with the Luhn algorithm. | Pattern match, context, and checksum. |
 | ZA_DRIVER_LICENSE | The South African eNaTIS driver's licence number is an alphanumeric identifier of 10–14 characters. | Pattern match, context, and validation. |
 | ZA_VAT_NUMBER | The South African VAT registration number is a 10-digit identifier starting with 4. | Pattern match, context, and validation. |
 | ZA_COMPANY_REGISTRATION | The South African CIPC company registration number uses modern `YYYY/NNNNNN/NN` format or legacy prefixed formats such as CK. | Pattern match, context, and validation. |

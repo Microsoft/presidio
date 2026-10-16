@@ -17,10 +17,15 @@ def entities():
 @pytest.mark.parametrize(
     "text, expected_len, expected_positions",
     [
-        ("0123456789", 1, ((0, 10),)),
-        ("1234567890", 1, ((0, 10),)),
-        ("9123456789", 1, ((0, 10),)),
-        ("SARS tax reference 2987654321 on file.", 1, ((19, 29),)),
+        ("0123456782", 1, ((0, 10),)),
+        ("1234567897", 1, ((0, 10),)),
+        ("9123456783", 1, ((0, 10),)),
+        # Example from the SARS TIN description published by the OECD
+        ("0001339050", 1, ((0, 10),)),
+        ("SARS tax reference 2987654320 on file.", 1, ((19, 29),)),
+        # Wrong check digit, e.g. a phone number
+        ("0123456789", 0, ()),
+        ("Call me on 0821234567.", 0, ()),
         ("4020269678", 0, ()),
         ("5123456789", 0, ()),
         ("012345678", 0, ()),
@@ -39,9 +44,12 @@ def test_analyze_valid_and_invalid_za_income_tax_numbers(
 @pytest.mark.parametrize(
     "tax_number, expected",
     [
-        ("0123456789", True),
-        ("1234567890", True),
-        ("9123456789", True),
+        ("0123456782", True),
+        ("1234567897", True),
+        ("9123456783", True),
+        ("0001339050", True),
+        ("0123456789", False),
+        ("0821234567", False),
         ("4020269678", False),
         ("5123456789", False),
         ("012345678", False),
