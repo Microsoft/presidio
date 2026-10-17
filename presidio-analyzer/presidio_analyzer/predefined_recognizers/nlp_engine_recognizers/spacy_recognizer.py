@@ -38,7 +38,7 @@ class SpacyRecognizer(LocalRecognizer):
         self,
         supported_language: str = "en",
         supported_entities: Optional[List[str]] = None,
-        ner_strength: float = 0.85,
+        ner_strength: Optional[float] = None,
         default_explanation: Optional[str] = None,
         check_label_groups: Optional[List[Tuple[Set, Set]]] = None,
         context: Optional[List[str]] = None,
@@ -48,11 +48,18 @@ class SpacyRecognizer(LocalRecognizer):
 
         :param supported_language: Language this recognizer supports
         :param supported_entities: The entities this recognizer can detect
-        :param ner_strength: Default confidence for NER prediction
+        :param ner_strength: (DEPRECATED) Has no effect; scores come from the NLP engine's NerModelConfiguration.default_score
         :param check_label_groups: (DEPRECATED) Tuple containing Presidio entity names
         :param default_explanation: Default explanation for the results when using return_decision_process=True
         """  # noqa: E501
 
+        if ner_strength is not None:
+            warnings.warn(
+                "ner_strength is deprecated and isn't used; "
+                "scores come from NerModelConfiguration.default_score",
+                DeprecationWarning,
+                2,
+            )
         self.ner_strength = ner_strength
         if check_label_groups:
             warnings.warn(
