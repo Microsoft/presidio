@@ -18,8 +18,10 @@ from presidio_analyzer import (
 )
 from presidio_analyzer.nlp_engine import (
     NlpArtifacts,
+    NoOpNlpEngine,
     SpacyNlpEngine,
 )
+from presidio_analyzer.predefined_recognizers import CreditCardRecognizer
 from presidio_analyzer.recognizer_registry import RecognizerRegistryProvider
 
 # noqa: F401
@@ -1274,3 +1276,38 @@ def test_when_regex_allow_list_is_all_empty_entries_then_results_are_kept():
     )
 
     assert filtered == results
+
+
+@pytest.mark.parametrize(
+    "entities",
+    [["CREDIT_CARD"], ["CREDIT_CARD", "UNSUPPORTED_ENTITY"]],
+)
+def test_when_analyze_with_supported_entities_then_return_exact_results(
+    entities,
+    caplog,
+):
+    analyzer_engine = AnalyzerEngine(
+        registry=RecognizerRegistry([CreditCardRecognizer()]),
+        nlp_engine=NoOpNlpEngine(models=[{"lang_code": "en", "model_name": "no_op"}]),
+    )
+    with caplog.at_level("WARNING", logger="presidio-analyzer"):
+        results = analyzer_engine.analyze(
+            text="My name is David and his number is 4095-2609-9393-4932",
+            entities=entities,
+            language="en",
+        )
+
+    assert len(results) == 1
+    assert_result(results[0], "CREDIT_CARD", 35, 54, 1.0)
+    warnings = [
+        record.message for record in caplog.records if record.levelname == "WARNING"
+    ]
+    if "UNSUPPORTED_ENTITY" in entities:
+        assert len(warnings) == 1
+        assert "UNSUPPORTED_ENTITY" in warnings[0]
+        assert "language : en" in warnings[0]
+        assert "deprecated" in warnings[0]
+        assert "will raise an error in a future version" in warnings[0]
+        assert "get_supported_entities" in warnings[0]
+    else:
+        assert warnings == []

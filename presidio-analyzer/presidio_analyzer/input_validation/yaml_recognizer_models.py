@@ -364,8 +364,8 @@ class CustomRecognizerConfig(BaseRecognizerConfig):
     deny_list: Optional[List[str]] = Field(
         default=None, description="Words to deny/exclude"
     )
-    deny_list_score: Optional[float] = Field(
-        default=0.0, ge=0.0, le=1.0, description="Deny list score"
+    deny_list_score: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Deny list score"
     )
 
     # Language validation (legacy and new formats)

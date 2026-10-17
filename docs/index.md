@@ -17,7 +17,7 @@ bitcoin wallets, US phone numbers, financial data and more.
 
 
 !!! info "Project transition update"
-    Presidio is transitioning to a community-owned project.
+    Presidio has transitioned to a community-owned project.
     Read the full announcement [here](project_transition.md).
 
 

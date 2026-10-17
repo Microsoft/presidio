@@ -592,6 +592,10 @@ components:
           description: "List of words to be returned as PII if found."
           items:
             type: string
+        deny_list_score:
+          type: number
+          format: double
+          description: "Confidence score for a term identified using a deny-list. Defaults to 1.0."
         context:
           description: "List of words to be used to increase confidence if found in the vicinity of detected entities."
           type: array
@@ -600,6 +604,9 @@ components:
         supported_entity:
           type: string
           description: "The name of entity this ad hoc recognizer detects"
+        global_regex_flags:
+          type: integer
+          description: "Regex flags used when matching the patterns and the deny-list, as a bitmask of Python `re` flags. Defaults to 26 (re.DOTALL | re.MULTILINE | re.IGNORECASE), so matching is case-insensitive unless this is overridden."
 
     EntityTypes:
       description: "The supported PII entity types."

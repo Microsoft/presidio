@@ -100,12 +100,22 @@ class PresidioCLIConfig(object):
             self.entities = self.analyzer.get_supported_entities()
 
         if "threshold" in conf:
-            if not 0 <= float(self.threshold) <= 1:
+            try:
+                # YAML loads true/yes/on as booleans, which float() would accept
+                if isinstance(conf["threshold"], bool):
+                    raise TypeError("threshold is a boolean")
+                threshold = float(conf["threshold"])
+            except (TypeError, ValueError, OverflowError) as e:
                 raise PresidioCLIConfigError(
-                    f"Invalid threshold value: {self.threshold}. "
+                    f"Invalid threshold value: {conf['threshold']}. "
+                    "Threshold must be a number"
+                ) from e
+            if not 0 <= threshold <= 1:
+                raise PresidioCLIConfigError(
+                    f"Invalid threshold value: {conf['threshold']}. "
                     f"Threshold must be between 0 and 1"
                 )
-            self.threshold = float(conf["threshold"])
+            self.threshold = threshold
         if "allow" in conf:
             self.allow_list = conf["allow"]
         if "language" in conf:

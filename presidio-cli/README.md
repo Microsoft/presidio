@@ -70,7 +70,7 @@ Configuration file supports the following parameters in a yaml file:
 
 - allow - list of tokens that should not be marked as PII.
 
-- threshold - only show problems/findings whose scores are at or above this threshold.
+- threshold - only show problems/findings whose scores are at or above this threshold. Must be a number between 0 and 1.
 
 Note: a file requires at least one parameter to be set.
 
@@ -163,19 +163,19 @@ tests/conftest.py
   37:33     0.85     PERSON
 ```
 
-- github - similar to diff function in github
+- github - [GitHub Actions workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) that create a `warning` or `error` annotation for each finding
 
 ```shell
 presidio -d "entities:
   - PERSON" -f github tests/conftest.py
 # result
 ::group::tests/conftest.py
-::0.85 file=tests/conftest.py,line=34,col=58::34:58 [PERSON]
-::0.85 file=tests/conftest.py,line=37,col=33::37:33 [PERSON]
+::warning file=tests/conftest.py,line=34,col=58::34:58 [PERSON] score=0.85
+::warning file=tests/conftest.py,line=37,col=33::37:33 [PERSON] score=0.85
 ::endgroup::
 ```
 
-- colored - standard output format but with colors
+- colored - standard output format but with colors: error scores are red, warning scores are yellow
 
 - parsable - easy to parse automaticaly
 
@@ -190,6 +190,31 @@ presidio -d "entities:
 - auto - default format, switches automatically between those 2 modes:
   - github, if run on github - environment variables `GITHUB_ACTIONS` and `GITHUB_WORKFLOW` are set
   - colored, otherwise
+
+### Warnings and errors
+
+Each finding has a level based on its score:
+
+- error - the score is 1.0
+- warning - the score is below 1.0
+
+Use `--no-warnings` to output only error-level findings:
+
+```shell
+presidio --no-warnings tests/
+```
+
+### Exit codes
+
+- `0` - no findings were output
+- `1` - at least one finding was output, or the configuration is invalid
+- `2` - invalid command-line arguments
+
+Findings filtered out by `threshold` or `--no-warnings` do not affect the exit code. To report findings without failing a CI step, ignore the exit code:
+
+```shell
+presidio . || true
+```
 
 ### List of all parameters
 

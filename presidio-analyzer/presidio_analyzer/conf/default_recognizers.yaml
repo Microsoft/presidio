@@ -166,13 +166,6 @@ recognizers:
     type: predefined
     enabled: false
     country_code: uk
-    
-  - name: UkPostcodeRecognizer
-    supported_languages:
-    - en
-    type: predefined
-    enabled: false
-    country_code: uk
 
   - name: UkVehicleRegistrationRecognizer
     supported_languages:
@@ -345,7 +338,6 @@ recognizers:
   - name: KrBrnRecognizer
     supported_languages: 
     - ko
-    - kr
     type: predefined
     enabled: false
     country_code: kr
@@ -361,7 +353,6 @@ recognizers:
   - name: KrDriverLicenseRecognizer
     supported_languages: 
     - ko
-    - kr
     type: predefined
     enabled: false
     country_code: kr
@@ -369,7 +360,6 @@ recognizers:
   - name: KrFrnRecognizer
     supported_languages:
     - ko
-    - kr
     type: predefined
     enabled: false
     country_code: kr

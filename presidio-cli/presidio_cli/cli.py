@@ -53,7 +53,7 @@ class Format(object):
         """
         line = "  \033[2m%d:%d\033[0m" % (problem.line, problem.column)
         line += max(20 - len(line), 0) * " "
-        if problem.score < 1:  # warning
+        if problem.level == "warning":
             line += "\033[33m%s\033[0m" % problem.score
         else:
             line += "\033[31m%s\033[0m" % problem.score
@@ -66,19 +66,34 @@ class Format(object):
     @staticmethod
     def github(problem: PIIProblem, filename: str) -> str:
         """
-        Output the problem in git-diff-like format.
+        Output the problem as a GitHub Actions warning or error workflow command.
 
         :param problem: PIIProblem to be formatted.
         :param filename: Filename where the problem occurs.
+        :return: Workflow command that creates an annotation for the problem.
         """
-        line = (
-            f"::{str(problem.score)} file={filename},line={format(problem.line)},"
-            + f"col={format(problem.column)}::{format(problem.line)}"
-            + f":{format(problem.column)} [{problem.type}]"
-        )
+        message = f"{problem.line}:{problem.column} [{problem.type}]"
+        message += f" score={problem.score}"
         if problem.explanation:
-            line += problem.explanation
-        return line
+            message += f" ({problem.explanation})"
+        # Drop the ./ that `presidio .` adds, as run() does before analyze()
+        if filename.startswith(("./", ".\\")):
+            filename = filename[2:]
+        file = _escape_github_property(filename)
+        return (
+            f"::{problem.level} file={file},line={problem.line},col={problem.column}"
+            f"::{_escape_github_data(message)}"
+        )
+
+
+def _escape_github_data(value: str) -> str:
+    """Escape the message of a GitHub Actions workflow command."""
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _escape_github_property(value: str) -> str:
+    """Escape a property value of a GitHub Actions workflow command."""
+    return _escape_github_data(value).replace(":", "%3A").replace(",", "%2C")
 
 
 def threshold_value(value: str) -> float:
@@ -113,7 +128,7 @@ def show_problems(
     file: str,
     args_format: str,
     no_warn: bool,
-):
+) -> int:
     """
     Show formatted output of discovered problems.
 
@@ -121,8 +136,9 @@ def show_problems(
     :param file: processed filename for 'stdin'
     :param args_format: format in which to output discovered problems
     :param no_warn: whether to output only error level problems
+    :return: number of problems that were output
     """
-    max_level = 0
+    prob_num = 0
     first = True
 
     if args_format == "auto":
@@ -134,11 +150,12 @@ def show_problems(
     for problem in problems:
         if no_warn and (problem.level != "error"):
             continue
+        prob_num += 1
         if args_format == "parsable":
             print(Format.parsable(problem))
         elif args_format == "github":
             if first:
-                print("::group::%s" % file)
+                print("::group::%s" % _escape_github_data(file))
                 first = False
             print(Format.github(problem, file))
         elif args_format == "colored":
@@ -158,7 +175,7 @@ def show_problems(
     if not first and args_format != "parsable":
         print("")
 
-    return max_level
+    return prob_num
 
 
 def find_files_recursively(
@@ -269,7 +286,7 @@ def run() -> None:
         except Exception:
             traceback.print_exc()
             continue
-        prob_num = show_problems(
+        prob_num += show_problems(
             problems, file, args_format=args.format, no_warn=args.no_warnings
         )
 
@@ -279,7 +296,7 @@ def run() -> None:
         except EnvironmentError as e:
             print(e, file=sys.stderr)
             sys.exit(1)
-        prob_num = show_problems(
+        prob_num += show_problems(
             problems,
             "stdin",
             args_format=args.format,
