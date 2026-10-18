@@ -195,9 +195,7 @@ class AnonymizerEngine(EngineBase):
         """
         by_entity_type: Dict[str, List[Tuple[int, RecognizerResult]]] = {}
         for position, result in enumerate(analyzer_results):
-            by_entity_type.setdefault(result.entity_type, []).append(
-                (position, result)
-            )
+            by_entity_type.setdefault(result.entity_type, []).append((position, result))
 
         kept: List[Tuple[int, RecognizerResult]] = []
         for positioned_results in by_entity_type.values():
