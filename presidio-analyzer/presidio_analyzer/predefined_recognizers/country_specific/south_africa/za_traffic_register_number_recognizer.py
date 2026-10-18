@@ -62,7 +62,10 @@ class ZaTrafficRegisterNumberRecognizer(PatternRecognizer):
             name=name,
         )
 
-    def validate_result(self, pattern_text: str) -> bool:  # noqa: D102
+    def validate_result(self, pattern_text: str) -> Optional[bool]:  # noqa: D102
         if len(pattern_text) != self.TRN_LENGTH or not pattern_text.isdigit():
             return False
-        return not self._id_validator.validate_result(pattern_text)
+        if self._id_validator.validate_result(pattern_text):
+            return False
+        # Shape check only: keep the pattern score, do not promote to 1.0.
+        return None

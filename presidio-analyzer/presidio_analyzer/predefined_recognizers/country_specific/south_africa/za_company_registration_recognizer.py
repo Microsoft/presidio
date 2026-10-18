@@ -65,14 +65,17 @@ class ZaCompanyRegistrationRecognizer(PatternRecognizer):
             name=name,
         )
 
-    def validate_result(self, pattern_text: str) -> bool:  # noqa: D102
+    def validate_result(self, pattern_text: str) -> Optional[bool]:  # noqa: D102
         text = pattern_text.upper()
         parts = text.split("/")
         if len(parts) == 3 and parts[0].isdigit():
-            return self._validate_modern_format(text)
-        if len(parts) == 2:
-            return self._validate_legacy_format(text)
-        return False
+            well_formed = self._validate_modern_format(text)
+        elif len(parts) == 2:
+            well_formed = self._validate_legacy_format(text)
+        else:
+            well_formed = False
+        # Shape check only: keep the pattern score, do not promote to 1.0.
+        return None if well_formed else False
 
     def _validate_modern_format(self, text: str) -> bool:
         parts = text.split("/")

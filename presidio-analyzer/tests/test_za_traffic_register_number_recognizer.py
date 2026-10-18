@@ -33,19 +33,19 @@ def entities():
     ],
 )
 def test_analyze_valid_and_invalid_za_traffic_register_numbers(
-    text, expected_len, expected_positions, recognizer, entities, max_score
+    text, expected_len, expected_positions, recognizer, entities
 ):
     results = recognizer.analyze(text, entities)
     assert len(results) == expected_len
     for res, (st_pos, fn_pos) in zip(results, expected_positions):
-        assert_result(res, entities[0], st_pos, fn_pos, max_score)
+        assert_result(res, entities[0], st_pos, fn_pos, 0.05)
 
 
 @pytest.mark.parametrize(
     "trn, expected",
     [
-        ("1234567890123", True),
-        ("6001015000076", True),
+        ("1234567890123", None),
+        ("6001015000076", None),
         ("8001015009087", False),
         ("123456789012", False),
         ("12345678901234", False),

@@ -66,10 +66,13 @@ class ZaDriverLicenseRecognizer(PatternRecognizer):
             name=name,
         )
 
-    def validate_result(self, pattern_text: str) -> bool:  # noqa: D102
+    def validate_result(self, pattern_text: str) -> Optional[bool]:  # noqa: D102
         text = pattern_text.upper()
         if not self.MIN_LENGTH <= len(text) <= self.MAX_LENGTH:
             return False
         if re.fullmatch(r"\d{6,10}[A-Z0-9]{2,5}", text) is None:
             return False
-        return bool(re.search(r"[A-Z]", text))
+        if not re.search(r"[A-Z]", text):
+            return False
+        # Shape check only: keep the pattern score, do not promote to 1.0.
+        return None

@@ -85,7 +85,7 @@ class ZaLicensePlateRecognizer(PatternRecognizer):
             name=name,
         )
 
-    def validate_result(self, pattern_text: str) -> bool:  # noqa: D102
+    def validate_result(self, pattern_text: str) -> Optional[bool]:  # noqa: D102
         sanitized = EntityRecognizer.sanitize_value(
             pattern_text, self.replacement_pairs
         ).upper()
@@ -101,4 +101,5 @@ class ZaLicensePlateRecognizer(PatternRecognizer):
         if not body or not any(char.isalpha() for char in body):
             return False
 
-        return True
+        # Shape check only: keep the pattern score, do not promote to 1.0.
+        return None
