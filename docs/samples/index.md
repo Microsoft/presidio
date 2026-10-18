@@ -29,6 +29,7 @@
 | Usage | Text      | Python file                            | [Synthetic data generation with OpenAI](python/synth_data_with_openai.ipynb)|
 | Usage | Text      | Python file                            | [Keeping some entities from being anonymized](python/keep_entities.ipynb)|
 | Usage | Text     | LiteLLM Proxy                           | [PII Masking LLM calls across Anthropic/Gemini/Bedrock/Azure, etc.](docker/litellm.md)|
+| Usage | Text     | AISIX AI Gateway                        | [Protect LLM requests with Presidio and AISIX AI Gateway](docker/aisix.md)|
 | Usage | Text     | Python Notebook                         | [YAML based no-code configuration](python/no_code_config.ipynb) |
 | Usage | Text     | Python file                             | [Using GLiNER within Presidio](python/gliner.md) |
 | Usage      | | REST API (postman)                          | [Presidio as a REST endpoint](docker/index.md)|

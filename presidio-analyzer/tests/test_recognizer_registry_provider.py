@@ -76,6 +76,47 @@ def test_recognizer_registry_provider_inline_thresholds_attach_to_instance():
     assert recognizer.score_thresholds == {"default": 0.4}
 
 
+def test_recognizer_registry_provider_omitted_deny_list_score_defaults_to_one():
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "Titles",
+                    "supported_entity": "TITLE",
+                    "deny_list": ["Mr.", "Mrs."],
+                }
+            ],
+        }
+    )
+
+    recognizer = provider.create_recognizer_registry().recognizers[0]
+
+    assert recognizer.deny_list_score == 1.0
+    assert all(pattern.score == 1.0 for pattern in recognizer.patterns)
+
+
+def test_recognizer_registry_provider_explicit_deny_list_score_is_honored():
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "Titles",
+                    "supported_entity": "TITLE",
+                    "deny_list": ["Mr.", "Mrs."],
+                    "deny_list_score": 0.3,
+                }
+            ],
+        }
+    )
+
+    recognizer = provider.create_recognizer_registry().recognizers[0]
+
+    assert recognizer.deny_list_score == 0.3
+    assert all(pattern.score == 0.3 for pattern in recognizer.patterns)
+
+
 def test_recognizer_registry_provider_omitted_thresholds_default_to_empty():
     provider = RecognizerRegistryProvider(
         registry_configuration={
