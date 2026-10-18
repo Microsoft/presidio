@@ -165,6 +165,39 @@ def test_deny_list_non_space_separator_identified_correctly(
     assert len(result) == expected_len
 
 
+@pytest.mark.parametrize(
+    "deny_list, text, expected",
+    [
+        (["Ann", "Ann Marie"], "Patient Ann Marie was admitted.", ["Ann Marie"]),
+        (["Ann Marie", "Ann"], "Patient Ann Marie was admitted.", ["Ann Marie"]),
+        (["St", "St. Mary's"], "Moved from St. Mary's today.", ["St. Mary's"]),
+        (["Ann", "Ann Marie"], "Ann and Ann Marie", ["Ann", "Ann Marie"]),
+    ],
+)
+def test_deny_list_term_prefixing_another_does_not_cut_it_short(
+    deny_list, text, expected
+):
+    recognizer = PatternRecognizer(supported_entity="NAME", deny_list=deny_list)
+
+    results = recognizer.analyze(text, entities=["NAME"])
+
+    assert [text[r.start : r.end] for r in results] == expected
+
+
+@pytest.mark.parametrize("deny_list", [["ßßß X", "SSSSSS"], ["SSSSSS", "ßßß X"]])
+def test_deny_list_longest_match_with_full_case_folding(deny_list):
+    # "SSSSSS" is the longer term but matches only "ßßß" under full case folding
+    recognizer = PatternRecognizer(
+        supported_entity="NAME",
+        deny_list=deny_list,
+        global_regex_flags=re.DOTALL | re.IGNORECASE | regex_module.FULLCASE,
+    )
+
+    results = recognizer.analyze("ßßß X", entities=["NAME"])
+
+    assert [(r.start, r.end) for r in results] == [(0, 5)]
+
+
 def test_deny_list_score_change():
     deny_list = ["Mr.", "Mrs."]
     recognizer = PatternRecognizer(
