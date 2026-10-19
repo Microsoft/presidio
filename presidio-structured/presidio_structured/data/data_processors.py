@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from numbers import Number
 from typing import Any, Callable, Dict, List, Union
 
 from pandas import DataFrame, isna
@@ -59,13 +58,14 @@ class DataProcessorBase(ABC):
 
     @staticmethod
     def _create_operator_callable(operator, params):
-        # The analyzer analyzes a number as str(value), and operators such as
-        # mask, hash and encrypt only work on text, so they get the same
-        # string. keep and custom lambdas still receive the value unchanged.
+        # The analyzer analyzes int and float values as str(value), and
+        # operators such as mask, hash and encrypt only work on text, so they
+        # get the same string. keep and custom lambdas still receive the value
+        # unchanged.
         convert_numbers = not isinstance(operator, (Custom, Keep))
 
         def operator_callable(text):
-            if convert_numbers and isinstance(text, Number):
+            if convert_numbers and isinstance(text, (int, float)):
                 text = str(text)
             return operator.operate(params=params, text=text)
 
