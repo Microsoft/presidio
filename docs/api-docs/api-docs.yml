@@ -556,6 +556,10 @@ components:
           type: boolean
           nullable: true
           description: "Result of a validation (e.g. checksum)"
+        identified_text:
+          type: string
+          nullable: true
+          description: "The text the entity was identified from. Returned only when return_decision_process is true, as it holds the PII value itself"
     
     Pattern:
       type: object

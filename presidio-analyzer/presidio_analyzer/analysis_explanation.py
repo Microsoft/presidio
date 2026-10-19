@@ -13,6 +13,10 @@ class AnalysisExplanation:
     :param validation_result: result of a validation (e.g. checksum)
     :param textual_explanation: Free text for describing
             a decision of a logic or model
+
+    The ``identified_text`` attribute holds the text the entity was identified
+    from. It is the PII value itself, so ``AnalyzerEngine`` only fills it in via
+    :meth:`set_identified_text` when the decision process is returned or logged.
     """
 
     def __init__(
@@ -35,6 +39,7 @@ class AnalysisExplanation:
         self.supportive_context_word = ""
         self.validation_result = validation_result
         self.regex_flags = regex_flags
+        self.identified_text = None
 
     def __repr__(self):
         """Create string representation of the object."""
@@ -48,6 +53,14 @@ class AnalysisExplanation:
     def set_supportive_context_word(self, word: str) -> None:
         """Set the context word which helped increase the score."""
         self.supportive_context_word = word
+
+    def set_identified_text(self, text: str) -> None:
+        """Set the text the entity was identified from.
+
+        This is the detected PII value, so callers are expected to gate it on the
+        decision process being requested or logged.
+        """
+        self.identified_text = text
 
     def append_textual_explanation_line(self, text: str) -> None:
         """Append a new line to textual_explanation field."""

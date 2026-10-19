@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from presidio_analyzer import (
+    AnalysisExplanation,
     AnalyzerEngine,
     EntityRecognizer,
     Pattern,
@@ -16,6 +17,7 @@ from presidio_analyzer import (
     RecognizerRegistry,
     RecognizerResult,
 )
+from presidio_analyzer.context_aware_enhancers import ContextAwareEnhancer
 from presidio_analyzer.nlp_engine import (
     NlpArtifacts,
     NoOpNlpEngine,
@@ -945,6 +947,191 @@ def test_given_decision_process_requested_then_response_contains_analysis(
 
     assert len(results) == 1
     assert results[0].analysis_explanation is not None
+
+
+def test_given_decision_process_requested_then_analysis_contains_identified_text(
+    loaded_analyzer_engine, unit_test_guid
+):
+    text = "John Smith drivers license is AC432223"
+    language = "en"
+    results = loaded_analyzer_engine.analyze(
+        correlation_id=unit_test_guid,
+        text=text,
+        return_decision_process=True,
+        language=language,
+    )
+
+    assert len(results) == 1
+    assert results[0].analysis_explanation.identified_text == "AC432223"
+    assert (
+        results[0].analysis_explanation.identified_text
+        == text[results[0].start : results[0].end]
+    )
+
+
+@pytest.mark.parametrize("return_decision_process", [True, False])
+def test_when_not_logging_then_identified_text_follows_the_return_flag_only(
+    unit_test_guid, return_decision_process
+):
+    """With logging off, `return_decision_process` alone decides the value."""
+    registry = RecognizerRegistry()
+    registry.add_recognizer(
+        PatternRecognizer(
+            supported_entity="TEST",
+            patterns=[Pattern("license", r"AC\d{6}", 0.8)],
+        )
+    )
+    analyzer_engine = AnalyzerEngine(
+        registry=registry, nlp_engine=NlpEngineMock(), log_decision_process=False
+    )
+
+    results = analyzer_engine.analyze(
+        correlation_id=unit_test_guid,
+        text="John Smith drivers license is AC432223",
+        return_decision_process=return_decision_process,
+        language="en",
+    )
+
+    assert len(results) == 1
+    if return_decision_process:
+        assert results[0].analysis_explanation.identified_text == "AC432223"
+    else:
+        assert results[0].analysis_explanation is None
+
+
+def test_when_decision_process_neither_returned_nor_logged_then_pii_is_never_written(
+    unit_test_guid,
+):
+    """On the default path the PII value must not be written at all.
+
+    ``__remove_decision_process`` only drops the result's reference to the
+    explanation, so an explanation object a recognizer still holds must never
+    have had the value written onto it. A pass-through context enhancer is used
+    because the default one deep-copies results, which would hide the write.
+    """
+    kept_explanations = []
+
+    class PassThroughEnhancer(ContextAwareEnhancer):
+        def enhance_using_context(
+            self, text, raw_results, nlp_artifacts, recognizers, context=None
+        ):
+            return raw_results
+
+    class RetainingRecognizer(EntityRecognizer, ABC):
+        def analyze(self, text: str, entities: List[str], nlp_artifacts: NlpArtifacts):
+            explanation = AnalysisExplanation(
+                recognizer="RetainingRecognizer", original_score=0.8
+            )
+            kept_explanations.append(explanation)
+            return [RecognizerResult("TEST", 30, 38, 0.8, explanation)]
+
+    registry = RecognizerRegistry()
+    registry.add_recognizer(RetainingRecognizer(supported_entities=["TEST"]))
+    analyzer_engine = AnalyzerEngine(
+        registry=registry,
+        nlp_engine=NlpEngineMock(),
+        context_aware_enhancer=PassThroughEnhancer(0, 0, 0, 0),
+    )
+
+    results = analyzer_engine.analyze(
+        correlation_id=unit_test_guid,
+        text="John Smith drivers license is AC432223",
+        return_decision_process=False,
+        language="en",
+    )
+
+    assert len(kept_explanations) == 1
+    assert results[0].analysis_explanation is None
+    assert kept_explanations[0].identified_text is None
+
+
+def test_when_decision_process_logged_but_not_returned_then_identified_text_is_log_only(
+    loaded_registry, unit_test_guid
+):
+    """The log opt-in must not drag the PII value into the API response."""
+    text = "John Smith drivers license is AC432223"
+    app_tracer_mock = AppTracerMock(enable_decision_process=True)
+    mock_nlp_artifacts = NlpArtifacts([], [], [], [], None, "en")
+    analyzer_engine = AnalyzerEngine(
+        loaded_registry,
+        NlpEngineMock(stopwords=[], punct_words=[], nlp_artifacts=mock_nlp_artifacts),
+        app_tracer=app_tracer_mock,
+        log_decision_process=True,
+    )
+
+    results = analyzer_engine.analyze(
+        correlation_id=unit_test_guid,
+        text=text,
+        return_decision_process=False,
+        language="en",
+    )
+
+    # the operator who turned the log on gets the value
+    assert "AC432223" in app_tracer_mock.get_last_trace()
+
+    # the caller who did not ask for the decision process does not
+    assert len(results) == 1
+    assert results[0].analysis_explanation is None
+    assert "AC432223" not in str(results[0].to_dict())
+
+
+def test_when_result_has_no_explanation_then_requesting_decision_process_keeps_it_empty(
+    unit_test_guid,
+):
+    class NoExplanationRecognizer(EntityRecognizer, ABC):
+        def analyze(self, text: str, entities: List[str], nlp_artifacts: NlpArtifacts):
+            return [RecognizerResult("TEST", 0, 4, 0.8)]
+
+    registry = RecognizerRegistry()
+    registry.add_recognizer(NoExplanationRecognizer(supported_entities=["TEST"]))
+    analyzer_engine = AnalyzerEngine(registry=registry, nlp_engine=NlpEngineMock())
+
+    results = analyzer_engine.analyze(
+        correlation_id=unit_test_guid,
+        text="John Smith",
+        return_decision_process=True,
+        language="en",
+    )
+
+    assert len(results) == 1
+    assert results[0].analysis_explanation is None
+
+
+def test_when_decision_process_logged_then_trace_holds_identified_text_per_line(
+    loaded_registry, unit_test_guid
+):
+    text = "John Smith drivers license is AC432223 and his card is 4095-2609-9393-4932"
+    app_tracer_mock = AppTracerMock(enable_decision_process=True)
+    mock_nlp_artifacts = NlpArtifacts([], [], [], [], None, "en")
+    analyzer_engine = AnalyzerEngine(
+        loaded_registry,
+        NlpEngineMock(stopwords=[], punct_words=[], nlp_artifacts=mock_nlp_artifacts),
+        app_tracer=app_tracer_mock,
+        log_decision_process=True,
+    )
+
+    results = analyzer_engine.analyze(
+        correlation_id=unit_test_guid,
+        text=text,
+        return_decision_process=True,
+        language="en",
+    )
+    trace = app_tracer_mock.get_last_trace()
+
+    assert {result.analysis_explanation.identified_text for result in results} == {
+        "AC432223",
+        "4095-2609-9393-4932",
+    }
+
+    # the log is the destination the issue asked for: the value is in the trace
+    assert "'identified_text': 'AC432223'" in trace
+    assert "'identified_text': '4095-2609-9393-4932'" in trace
+
+    # every entity gets its own line, so traces of long texts stay readable.
+    # Counted within the trace itself, so later result filtering cannot skew it.
+    entity_lines = [line for line in trace.splitlines() if "'entity_type'" in line]
+    assert len(entity_lines) == trace.count("'entity_type'")
+    assert len(entity_lines) >= 2
 
 
 def test_when_read_test_spacy_nlp_conf_file_then_returns_spacy_nlp_engine(

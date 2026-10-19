@@ -7,6 +7,7 @@ Presidio-analyzer's decision process exposes information on why a specific PII w
 - Interpretability mechanisms in ML models
 - Which context words improved the score
 - Confidence scores before and after each step
+- The text each entity was identified from (`identified_text`)
 And more.
 
 For more information, refer to the [decision process documentation](https://data-privacy-stack.github.io/presidio/analyzer/decision_process/).

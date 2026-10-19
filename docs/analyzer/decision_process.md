@@ -9,6 +9,7 @@ Presidio-analyzer's decision process exposes information on why a specific PII w
 - Interpretability mechanisms in ML models
 - Which context words improved the score
 - Confidence scores before and after each step
+- The text each entity was identified from, when the decision process is returned or logged
 
 And more.
 
@@ -52,7 +53,20 @@ For example:
     
     # Get the decision process results for the first result
     print(results[0].analysis_explanation)
+
+    # The text the entity was identified from, e.g. for reading start/end offsets
+    print(results[0].analysis_explanation.identified_text)
     ```
+
+!!! warning "Warning"
+    `identified_text` holds the detected PII value itself.
+    It is returned only when `return_decision_process` is set, and it is written to
+    the decision process log only when the engine was created with
+    `log_decision_process=True`. Both are off by default.
+
+    Note that the decision process log already contains the source text, tokenized,
+    through the pre-existing `nlp artifacts` trace shown below. Enable
+    `log_decision_process` only where plaintext PII in logs is acceptable.
 
 ### Logging the decision process
 
@@ -93,10 +107,17 @@ The following traces will be written to log, with this format:
 `[Date Time][decision_process][Log Level][Unique Correlation ID][Trace Message]`
 
 ```text
-[2019-07-14 14:22:32,409][decision_process][INFO][00000000-0000-0000-0000-000000000000][nlp artifacts:{'entities': (Bart Simpson, 4095, 425), 'tokens': ['My', 'name', 'is', 'Bart', 'Simpson', ',', 'my', 'Credit', 'card', 'is', ':', '4095', '-', '2609', '-', '9393', '-', '4932', ',', ' ', 'my', 'phone', 'is', '425', '8829090'], 'lemmas': ['My', 'name', 'be', 'Bart', 'Simpson', ',', 'my', 'Credit', 'card', 'be', ':', '4095', '-', '2609', '-', '9393', '-', '4932', ',', ' ', 'my', 'phone', 'be', '425', '8829090'], 'tokens_indices': [0, 3, 8, 11, 16, 23, 25, 28, 35, 40, 42, 44, 48, 49, 53, 54, 58, 59, 63, 65, 66, 69, 75, 78, 82], 'keywords': ['bart', 'simpson', 'credit', 'card', '4095', '2609', '9393', '4932', ' ', 'phone', '425', '8829090']}]
+[2019-07-14 14:22:32,409][decision_process][INFO][00000000-0000-0000-0000-000000000000][nlp artifacts:{"entities": ["Bart Simpson"], "tokens": ["My", "name", "is", "Bart", "Simpson", ",", "my", "Credit", "card", "is", ":", "4095", "-", "2609", "-", "9393", "-", "4932", ",", " ", "my", "phone", "is", "425", "8829090"], "lemmas": ["my", "name", "be", "Bart", "Simpson", ",", "my", "credit", "card", "be", ":", "4095", "-", "2609", "-", "9393", "-", "4932", ",", " ", "my", "phone", "be", "425", "8829090"], "tokens_indices": [0, 3, 8, 11, 16, 23, 25, 28, 35, 40, 42, 44, 48, 49, 53, 54, 58, 59, 63, 65, 66, 69, 75, 78, 82], "keywords": ["bart", "simpson", "credit", "card", "4095", "2609", "9393", "4932", " ", "phone", "425", "8829090"], "scores": [0.85]}]
 
-[2019-07-14 14:22:32,417][decision_process][INFO][00000000-0000-0000-0000-000000000000][["{'entity_type': 'CREDIT_CARD', 'start': 44, 'end': 63, 'score': 1.0, 'analysis_explanation': {'recognizer': 'CreditCardRecognizer', 'pattern_name': 'All Credit Cards (weak)', 'pattern': '\\\\b((4\\\\d{3})|(5[0-5]\\\\d{2})|(6\\\\d{3})|(1\\\\d{3})|(3\\\\d{3}))[- ]?(\\\\d{3,4})[- ]?(\\\\d{3,4})[- ]?(\\\\d{3,5})\\\\b', 'original_score': 0.3, 'score': 1.0, 'textual_explanation': None, 'score_context_improvement': 0.7, 'supportive_context_word': 'credit', 'validation_result': True}}", "{'entity_type': 'PERSON', 'start': 11, 'end': 23, 'score': 0.85, 'analysis_explanation': {'recognizer': 'SpacyRecognizer', 'pattern_name': None, 'pattern': None, 'original_score': 0.85, 'score': 0.85, 'textual_explanation': \"Identified as PERSON by Spacy's Named Entity Recognition\", 'score_context_improvement': 0, 'supportive_context_word': '', 'validation_result': None}}", "{'entity_type': 'PHONE_NUMBER', 'start': 78, 'end': 89, 'score': 0.85, 'analysis_explanation': {'recognizer': 'UsPhoneRecognizer', 'pattern_name': 'Phone (medium)', 'pattern': '\\\\b(\\\\d{3}[-\\\\.\\\\s]\\\\d{3}[-\\\\.\\\\s]??\\\\d{4})\\\\b', 'original_score': 0.5, 'score': 0.85, 'textual_explanation': None, 'score_context_improvement': 0.35, 'supportive_context_word': 'phone', 'validation_result': None}}"]]
+[2019-07-14 14:22:32,417][decision_process][INFO][00000000-0000-0000-0000-000000000000][[
+  "{'entity_type': 'CREDIT_CARD', 'start': 44, 'end': 63, 'score': 1.0, 'analysis_explanation': {'recognizer': 'CreditCardRecognizer', 'pattern_name': 'All Credit Cards (weak)', 'pattern': '\\\\b(?!1\\\\d{12}(?!\\\\d))((4\\\\d{3})|(5[0-5]\\\\d{2})|(6\\\\d{3})|(1\\\\d{3})|(3\\\\d{3}))[- ]?(\\\\d{3,4})[- ]?(\\\\d{3,4})[- ]?(\\\\d{3,5})\\\\b', 'original_score': 0.3, 'score': 1.0, 'textual_explanation': 'Detected by `CreditCardRecognizer` using pattern `All Credit Cards (weak)`', 'score_context_improvement': 0.7, 'supportive_context_word': 'credit', 'validation_result': True, 'regex_flags': 26, 'identified_text': '4095-2609-9393-4932'}, 'recognition_metadata': {'recognizer_name': 'CreditCardRecognizer', 'recognizer_identifier': 'CreditCardRecognizer_4828955712'}}",
+  "{'entity_type': 'US_DRIVER_LICENSE', 'start': 82, 'end': 89, 'score': 0.01, 'analysis_explanation': {'recognizer': 'UsLicenseRecognizer', 'pattern_name': 'Driver License - Digits (very weak)', 'pattern': '\\\\b([0-9]{6,14}|[0-9]{16})\\\\b', 'original_score': 0.01, 'score': 0.01, 'textual_explanation': 'Detected by `UsLicenseRecognizer` using pattern `Driver License - Digits (very weak)`', 'score_context_improvement': 0, 'supportive_context_word': '', 'validation_result': None, 'regex_flags': 26, 'identified_text': '8829090'}, 'recognition_metadata': {'recognizer_name': 'UsLicenseRecognizer', 'recognizer_identifier': 'UsLicenseRecognizer_4828963440'}}",
+  "{'entity_type': 'PHONE_NUMBER', 'start': 78, 'end': 89, 'score': 0.75, 'analysis_explanation': {'recognizer': 'PhoneRecognizer', 'pattern_name': None, 'pattern': None, 'original_score': 0.4, 'score': 0.75, 'textual_explanation': 'Recognized as US region phone number, using PhoneRecognizer', 'score_context_improvement': 0.35, 'supportive_context_word': 'phone', 'validation_result': None, 'regex_flags': None, 'identified_text': '425 8829090'}, 'recognition_metadata': {'recognizer_name': 'PhoneRecognizer', 'recognizer_identifier': 'PhoneRecognizer_4983685536'}}",
+  "{'entity_type': 'PERSON', 'start': 11, 'end': 23, 'score': 0.85, 'analysis_explanation': {'recognizer': 'SpacyRecognizer', 'pattern_name': None, 'pattern': None, 'original_score': 0.85, 'score': 0.85, 'textual_explanation': \"Identified as PERSON by Spacy's Named Entity Recognition\", 'score_context_improvement': 0, 'supportive_context_word': '', 'validation_result': None, 'regex_flags': None, 'identified_text': 'Bart Simpson'}, 'recognition_metadata': {'recognizer_name': 'SpacyRecognizer', 'recognizer_identifier': 'SpacyRecognizer_4828966128'}}"
+]]
 ```
+
+Two things to note when comparing against your own run. The results trace is written before low-score filtering and deduplication, so it can list more entities than the `analyze` response returns (here `US_DRIVER_LICENSE` at score `0.01`). And the timestamps, correlation id and the numeric suffix of each `recognizer_identifier` differ on every run.
 
 ## Writing custom decision process for a recognizer
 

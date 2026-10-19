@@ -194,7 +194,10 @@ class AnalyzerEngine:
         request. When omitted, the analyzer uses an entity-specific recognizer
         threshold, the recognizer's default threshold, then the engine default.
         :param return_decision_process: Whether the analysis decision process steps
-        returned in the response.
+        returned in the response. When enabled, the explanation of every result also
+        holds the text it was identified from, so the returned offsets can be read
+        without the original text at hand. The same value is written to the decision
+        process log when the engine was created with ``log_decision_process=True``.
         :param ad_hoc_recognizers: List of recognizers which will be used only
         for this specific request.
         :param context: List of context words to enhance confidence score if matched
@@ -275,10 +278,13 @@ class AnalyzerEngine:
             text, results, nlp_artifacts, recognizers, context
         )
 
+        if return_decision_process or self.log_decision_process:
+            results = self.__add_identified_text(results, text)
+
         if self.log_decision_process:
             self.app_tracer.trace(
                 correlation_id,
-                json.dumps([str(result.to_dict()) for result in results]),
+                json.dumps([str(result.to_dict()) for result in results], indent=2),
             )
 
         # Filter low-score results before deduplication so recognizer-specific
@@ -512,5 +518,24 @@ class AnalyzerEngine:
 
         for result in results:
             result.analysis_explanation = None
+
+        return results
+
+    @staticmethod
+    def __add_identified_text(
+        results: List[RecognizerResult], text: str
+    ) -> List[RecognizerResult]:
+        """Add the text each entity was identified from to its explanation.
+
+        The identified text is the PII value itself, so it is only attached when
+        the caller asked for the decision process to be returned or logged. On the
+        default path ``__remove_decision_process`` drops the explanation entirely.
+        """
+
+        for result in results:
+            if result.analysis_explanation:
+                result.analysis_explanation.set_identified_text(
+                    text[result.start : result.end]
+                )
 
         return results
