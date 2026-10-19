@@ -866,6 +866,12 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
             redacted_instance
         )
 
+        # The icon is a thumbnail of the image that the boxes below are not
+        # applied to, so drop it instead of writing out an unredacted copy
+        # (PS3.15 Annex E: remove the icon when its pixels cannot be cleaned)
+        if has_image_icon_sequence:
+            del redacted_instance[0x0088, 0x0200]
+
         # Select masking box color
         is_greyscale = cls._check_if_greyscale(instance)
         if is_greyscale:

@@ -1131,6 +1131,37 @@ def test_add_redact_box_happy_path(
     assert box_color_pixels_redacted > box_color_pixels_original
 
 
+def test_add_redact_box_removes_icon_image_sequence():
+    """Test that _add_redact_box does not keep an unredacted icon thumbnail."""
+    # Arrange
+    test_instance = pydicom.dcmread(Path(TEST_DICOM_PARENT_DIR, "0_ORIGINAL.dcm"))
+    thumbnail = np.arange(64 * 64, dtype=np.uint16).reshape(64, 64).astype(np.uint8)
+    icon = pydicom.dataset.Dataset()
+    icon.SamplesPerPixel = 1
+    icon.PhotometricInterpretation = "MONOCHROME2"
+    icon.Rows = 64
+    icon.Columns = 64
+    icon.BitsAllocated = 8
+    icon.BitsStored = 8
+    icon.HighBit = 7
+    icon.PixelRepresentation = 0
+    icon.PixelData = thumbnail.tobytes()
+    test_instance.IconImageSequence = pydicom.sequence.Sequence([icon])
+    bounding_boxes_coordinates = [
+        {"top": 0, "left": 0, "width": test_instance.Columns, "height": test_instance.Rows}
+    ]
+
+    # Act
+    test_redacted_instance = DicomImageRedactorEngine._add_redact_box(
+        test_instance, bounding_boxes_coordinates, 0.75
+    )
+
+    # Assert
+    assert len(np.unique(test_redacted_instance.pixel_array)) == 1
+    assert "IconImageSequence" not in test_redacted_instance
+    assert "IconImageSequence" in test_instance
+
+
 # ------------------------------------------------------
 # DicomImageRedactorEngine._get_analyzer_results()
 # ------------------------------------------------------
