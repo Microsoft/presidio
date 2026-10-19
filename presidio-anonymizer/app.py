@@ -1,5 +1,6 @@
 """REST API server for anonymizer."""
 
+import json
 import logging
 import os
 from logging.config import fileConfig
@@ -57,11 +58,33 @@ class Server:
             if AppEntitiesConvertor.check_custom_operator(anonymizers_config):
                 raise BadRequest("Custom type anonymizer is not supported")
 
+            text = content.get("text", "")
+            if isinstance(text, list):
+                results = [
+                    self.anonymizer.anonymize(
+                        text=item_text,
+                        analyzer_results=AppEntitiesConvertor.analyzer_results_from_json(
+                            item_analyzer_results
+                        ),
+                        operators=anonymizers_config,
+                    )
+                    for item_text, item_analyzer_results in zip(
+                        text,
+                        _batch_items(
+                            "analyzer_results", content.get("analyzer_results"), text
+                        ),
+                    )
+                ]
+                return Response(
+                    json.dumps(results, default=lambda o: o.__dict__),
+                    mimetype="application/json",
+                )
+
             analyzer_results = AppEntitiesConvertor.analyzer_results_from_json(
                 content.get("analyzer_results")
             )
             anoymizer_result = self.anonymizer.anonymize(
-                text=content.get("text", ""),
+                text=text,
                 analyzer_results=analyzer_results,
                 operators=anonymizers_config,
             )
@@ -73,11 +96,35 @@ class Server:
             if not content:
                 raise BadRequest("Invalid request json")
             text = content.get("text", "")
-            deanonymize_entities = AppEntitiesConvertor.deanonymize_entities_from_json(
-                content
-            )
             deanonymize_config = AppEntitiesConvertor.operators_config_from_json(
                 content.get("deanonymizers")
+            )
+
+            if isinstance(text, list):
+                results = [
+                    self.deanonymize.deanonymize(
+                        text=item_text,
+                        entities=AppEntitiesConvertor.deanonymize_entities_from_json(
+                            {"anonymizer_results": item_entities}
+                        ),
+                        operators=deanonymize_config,
+                    )
+                    for item_text, item_entities in zip(
+                        text,
+                        _batch_items(
+                            "anonymizer_results",
+                            content.get("anonymizer_results"),
+                            text,
+                        ),
+                    )
+                ]
+                return Response(
+                    json.dumps(results, default=lambda o: o.__dict__),
+                    mimetype="application/json",
+                )
+
+            deanonymize_entities = AppEntitiesConvertor.deanonymize_entities_from_json(
+                content
             )
             deanonymized_response = self.deanonymize.deanonymize(
                 text=text, entities=deanonymize_entities, operators=deanonymize_config
@@ -112,9 +159,30 @@ class Server:
             self.logger.error(f"A fatal error occurred during execution: {e}")
             return jsonify(error="Internal server error"), 500
 
-def create_app(): # noqa
+
+def _batch_items(field_name, value, texts):
+    """Align a per-item results field with a batch ``text`` list.
+
+    :param field_name: name of the request field, used in the error message.
+    :param value: the raw request value for that field (expected to be a list
+        of lists, one per item in ``texts``), or ``None`` if omitted.
+    :param texts: the batch ``text`` list the request is being validated against.
+    """
+    if value is None:
+        return [[] for _ in texts]
+    if len(value) != len(texts):
+        raise InvalidParamError(
+            f"Invalid input, '{field_name}' must contain one list of results "
+            f"per item in 'text' when 'text' is a list ({len(texts)} text "
+            f"items, {len(value)} '{field_name}' items)"
+        )
+    return value
+
+
+def create_app():  # noqa
     server = Server()
     return server.app
+
 
 if __name__ == "__main__":
     app = create_app()

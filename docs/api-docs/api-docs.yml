@@ -178,7 +178,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AnonymizeResponse"
+                oneOf:
+                  - description: "An anonymization result (when input text is a single string)"
+                    $ref: "#/components/schemas/AnonymizeResponse"
+                  - description: "A list of anonymization results (when input text is an array of strings)"
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AnonymizeResponse"
               examples:
                 Replace and Redact Anonymizers:
                   value:
@@ -186,6 +192,12 @@ paths:
                 Replace as default Anonymizer:
                   value:
                     { "text": "hello world, my name is ANONYMIZED. My number is: ANONYMIZED", "items": [ { "operator": "replace", "entity_type": "PHONE_NUMBER", "start": 50, "end": 60, "text": "ANONYMIZED" }, { "operator": "replace", "entity_type": "NAME", "start": 24, "end": 34, "text": "ANONYMIZED" } ] }
+                Batch response (array of texts):
+                  value:
+                    [
+                      { "text": "hello world, my name is ANONYMIZED.", "items": [ { "operator": "replace", "entity_type": "NAME", "start": 24, "end": 34, "text": "ANONYMIZED" } ] },
+                      { "text": "call me at ANONYMIZED", "items": [ { "operator": "replace", "entity_type": "PHONE_NUMBER", "start": 11, "end": 21, "text": "ANONYMIZED" } ] }
+                    ]
         400:
           $ref: "#/components/responses/400BadRequest"
 
@@ -232,11 +244,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DeanonymizeResponse"
+                oneOf:
+                  - description: "A deanonymization result (when input text is a single string)"
+                    $ref: "#/components/schemas/DeanonymizeResponse"
+                  - description: "A list of deanonymization results (when input text is an array of strings)"
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DeanonymizeResponse"
               examples:
                 Decrypt Single PII:
                   value:
                     { "text": "text_for_encryption", "items": [ { "start": 0, "end": 19, "operator":"decrypt", "text": "text_for_encryption","entity_type": "NUMBER" } ] }
+                Batch response (array of texts):
+                  value:
+                    [
+                      { "text": "text_for_encryption_1", "items": [ { "start": 0, "end": 22, "operator": "decrypt", "text": "text_for_encryption_1", "entity_type": "NUMBER" } ] },
+                      { "text": "text_for_encryption_2", "items": [ { "start": 0, "end": 22, "operator": "decrypt", "text": "text_for_encryption_2", "entity_type": "NUMBER" } ] }
+                    ]
         400:
           $ref: "#/components/responses/400BadRequest"
 
@@ -362,6 +386,18 @@ components:
                     { "start": 24, "end": 32, "score": 0.8, "entity_type": "PERSON" },
                   ]
                 }
+            Batch Request (array of texts):
+              value:
+                {
+                  "text": ["hello world, my name is Jane Doe.", "call me at 034453334"],
+                  "anonymizers": {
+                    "DEFAULT": { "type": "replace", "new_value": "ANONYMIZED" }
+                  },
+                  "analyzer_results": [
+                    [ { "start": 24, "end": 32, "score": 0.8, "entity_type": "PERSON" } ],
+                    [ { "start": 11, "end": 20, "score": 0.95, "entity_type": "PHONE_NUMBER" } ]
+                  ]
+                }
 
     DeanonymizeRequest:
       required: true
@@ -385,6 +421,18 @@ components:
                     "end": 55,
                     "entity_type": "PERSON"
                   } ]
+                }
+            Batch Request (array of texts):
+              value:
+                {
+                  "text": ["S184CMt9Drj7QaKQ21JTrpYzghnboTF9pn/neN8JME0=", "aQ21JTrpYzghnboTF9pn/nOMt9Drj7QaK4CE0M="],
+                  "deanonymizers": {
+                    "PERSON": { "type": "decrypt", "key": "WmZq4t7w!z%C&F)J" }
+                  },
+                  "anonymizer_results": [
+                    [ { "start": 11, "end": 55, "entity_type": "PERSON" } ],
+                    [ { "start": 0, "end": 38, "entity_type": "PERSON" } ]
+                  ]
                 }
 
 
@@ -442,8 +490,12 @@ components:
         - analyzer_results
       properties:
         text:
-          type: string
-          description: "The text to anonymize"
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: "The text to anonymize. Can be a single string or an array of strings; when an array, 'analyzer_results' must be an array of the same length, one list of results per text."
           example: "hello world, my name is Jane Doe. My number is: 034453334"
         anonymizers:
           description: "Object where the key is DEFAULT or the ENTITY_TYPE and the value is the anonymizer definition"
@@ -459,10 +511,16 @@ components:
             { "DEFAULT": { "type": "replace", "new_value": "<ENTITY_TYPE>" } }
 
         analyzer_results:
-          type: array
-          description: "Array of analyzer detections"
-          items:
-            $ref: "#/components/schemas/RecognizerResult"
+          description: "Array of analyzer detections (single text), or an array of such arrays, one per text (batch request)"
+          oneOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/RecognizerResult"
+            - type: array
+              items:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecognizerResult"
 
     DeanonymizeRequest:
       type: object
@@ -472,8 +530,12 @@ components:
         - deanonymizers
       properties:
         text:
-          type: string
-          description: "The anonymized text"
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: "The anonymized text. Can be a single string or an array of strings; when an array, 'anonymizer_results' must be an array of the same length, one list of results per text."
           example: "My name is S184CMt9Drj7QaKQ21JTrpYzghnboTF9pn/neN8JME0="
         deanonymizers:
           description: "Object where the key is DEFAULT or the ENTITY_TYPE and the value is decrypt since it is the only one supported"
@@ -484,10 +546,16 @@ components:
           default:
             { "DEFAULT": { "type": "decrypt", "key": "3t6w9z$C&F)J@NcR" } }
         anonymizer_results:
-          type: array
-          description: "Array of anonymized PIIs"
-          items:
-            $ref: "#/components/schemas/OperatorResult"
+          description: "Array of anonymized PIIs (single text), or an array of such arrays, one per text (batch request)"
+          oneOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/OperatorResult"
+            - type: array
+              items:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OperatorResult"
 
 
     RecognizerResult:
