@@ -1,9 +1,14 @@
 import time
 
 import pytest
+import regex as re
 
 from tests import assert_result
 from presidio_analyzer.predefined_recognizers import UrlRecognizer
+from presidio_analyzer.predefined_recognizers.generic.url_recognizer import (
+    load_tlds,
+    tlds_to_regex,
+)
 
 
 @pytest.fixture(scope="module")
@@ -35,10 +40,24 @@ def entities():
         ('"https://presidio.dataprivacystack.org/"', 1, ((0, 40),), 0.6),
         ("'https://presidio.dataprivacystack.org/'", 1, ((0, 40),), 0.6),
 
+        # Brand TLDs, incl. ones that share a prefix with a shorter TLD
+        # (.bank/.ba, .barclays/.bar, .americanexpress/.am)
+        ("https://www.chase.bank/login", 1, ((0, 28),), 0.6,),
+        ("chase.bank", 1, ((0, 10),), 0.5,),
+        ("https://home.barclays", 1, ((0, 21),), 0.6,),
+        ("www.americanexpress", 1, ((0, 19),), 0.5,),
+        ("wellsfargo.insurance", 1, ((0, 20),), 0.5,),
+        ("navy.creditunion", 1, ((0, 16),), 0.5,),
+        ("www.microsoft", 1, ((0, 13),), 0.5,),
+        ("'www.microsoft'", 1, ((0, 15),), 0.5,),
+
+        # A TLD must end the host, so a trailing non-TLD label is excluded
+        ("Visit www.example.com.Then call", 1, ((6, 21),), 0.5,),
+
         # Invalid URLs
-        ("www.microsoft", 0, (), 0),
         ("http://microsoft", 0, (), 0),
-        ("'www.microsoft'", 0, (), 0),
+        ("archive.tar.gz", 0, (), 0),
+        ("nosuch.invalidtld", 0, (), 0),
         # fmt: on
     ],
 )
@@ -71,3 +90,19 @@ def test_repeated_dot_input_does_not_backtrack(recognizer, entities):
     elapsed = time.time() - start
     assert results == []
     assert elapsed < 15
+
+def test_when_trie_regex_then_matches_exactly_the_tld_list():
+    tlds = load_tlds()
+    anchored = re.compile("^(?:" + tlds_to_regex(tlds) + ")$")
+    tld_set = set(tlds)
+
+    assert all(anchored.match(tld) for tld in tlds)
+    # Every proper prefix and one-character extension of a real TLD must only
+    # match if it is itself a TLD - this is the .bank/.ba failure mode.
+    for tld in tlds:
+        for candidate in [tld[:i] for i in range(1, len(tld))] + [
+            tld + char for char in "abz0-"
+        ]:
+            assert (anchored.match(candidate) is not None) == (candidate in tld_set), (
+                candidate
+            )
