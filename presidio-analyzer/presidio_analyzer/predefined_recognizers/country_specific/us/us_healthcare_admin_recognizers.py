@@ -64,9 +64,15 @@ class UsClaimNumberRecognizer(PatternRecognizer):
     """Recognize US healthcare claim numbers with billing/claims context.
 
     CMS describes a claim number as the reference number shown on an
-    explanation of benefits, but does not prescribe a universal syntax. The
-    primary pattern anchors a numeric identifier on its claim label, while a
-    weak prefixed pattern supports structured data containing ``CLM`` values.
+    explanation of benefits, but does not prescribe a universal syntax.
+    Real-world claim numbers are alphanumeric: the X12 837 CLM01 element
+    (claim submitter's identifier) allows up to 38 alphanumeric characters.
+    The primary pattern anchors such an identifier on its claim label (a
+    digit is required so plain words cannot match), while a weak prefixed
+    pattern supports structured data containing ``CLM`` values and an X12
+    pattern matches the CLM segment of 837 claim files. Labelled values
+    match in any letter case, but a bare calendar date after the label
+    (for example ``2026-01-15``) is not a claim number and is excluded.
 
     Reference: https://www.cms.gov/medical-bill-rights/help/guides/explanation-of-benefits
     """
@@ -78,13 +84,20 @@ class UsClaimNumberRecognizer(PatternRecognizer):
             "Claim number (labelled)",
             r"(?<=\b(?:claim|medical\s+claim|healthcare\s+claim)"
             r"(?:\s*(?:#|no\.?|number|id)\s*:?\s*|\s*:\s*|\s+))"
-            r"(?:CLM-?)?\d{6,15}\b",
+            r"(?:CLM-?)?"
+            r"(?!(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2}-\d{2,4})(?![\w-]))"
+            r"(?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{6,38}\b",
             0.35,
         ),
         Pattern(
             "Claim number (weak prefixed)",
             r"\bCLM-?\d{6,15}\b",
             0.1,
+        ),
+        Pattern(
+            "Claim number (X12 837 CLM segment)",
+            r"(?<=\bCLM\*)[A-Z0-9]{1,38}(?=\*)",
+            0.3,
         ),
     ]
 
