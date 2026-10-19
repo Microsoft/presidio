@@ -111,6 +111,11 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
 | FI_PERSONAL_IDENTITY_CODE     | The Finnish Personal Identity Code (Henkilötunnus) is a unique 11 character individual identity number. | Pattern match, context and custom logic. |
 
+### France
+| FieldType  | Description                                                                                             | Detection Method                         |
+|------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
+| FR_NIR     | The French NIR (numéro de sécurité sociale / carte vitale number) is a 15-digit individual identifier. Disabled by default; enable via recognizer registry configuration. | Pattern match, context and checksum. |
+
 ### Korea
 | FieldType  | Description                                                                                             | Detection Method                         |
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|

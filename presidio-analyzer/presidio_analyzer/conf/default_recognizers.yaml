@@ -647,3 +647,11 @@ recognizers:
     type: predefined
     enabled: false
     country_code: ca
+
+  - name: FrNirRecognizer
+    supported_languages:
+    - en
+    - fr
+    type: predefined
+    enabled: false
+    country_code: fr
