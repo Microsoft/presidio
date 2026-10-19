@@ -101,6 +101,7 @@ nav:
       - Using Span Marker as an external PII model: https://github.com/data-privacy-stack/presidio/blob/main/docs/samples/python/span_marker_recognizer.py
       - Using Transformers as an external PII model: samples/python/transformers_recognizer/index.md
       - Using GLiNER as an external PII model: samples/python/gliner.md
+      - Anonymizing streamed LLM output: samples/python/streaming_llm_output/index.md
       - Pseudonymization (replace PII values using mappings): samples/python/pseudonymization.ipynb
       - Passing a lambda as a Presidio anonymizer using Faker: https://github.com/data-privacy-stack/presidio/blob/main/docs/samples/python/example_custom_lambda_anonymizer.py
       - Synthetic data generation with OpenAI: samples/python/synth_data_with_openai.ipynb
@@ -151,6 +152,8 @@ not_in_nav : |
   samples/python/transformers_recognizer/__init__.py
   samples/python/transformers_recognizer/configuration.py
   samples/python/transformers_recognizer/transformer_recognizer.py
+  samples/python/streaming_llm_output/streaming_anonymizer.py
+  samples/python/streaming_llm_output/test_streaming_anonymizer.py
 
 theme:
   name: material
