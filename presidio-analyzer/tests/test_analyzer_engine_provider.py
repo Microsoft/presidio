@@ -3,6 +3,7 @@
 import importlib.util
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import List
 from unittest.mock import patch
@@ -11,6 +12,7 @@ import pytest
 import yaml
 from install_nlp_models import _install_models_from_nlp_config, install_models
 from presidio_analyzer import AnalyzerEngineProvider, RecognizerResult
+from presidio_analyzer.context_aware_enhancers import LemmaContextAwareEnhancer
 from presidio_analyzer.nlp_engine import NlpArtifacts, SpacyNlpEngine
 from presidio_analyzer.predefined_recognizers import (
     AzureAILanguageRecognizer,
@@ -834,3 +836,135 @@ def test_install_models_from_nlp_config_missing_models_raises_value_error():
     """nlp_configuration without models raises ValueError."""
     with pytest.raises(ValueError, match="models"):
         _install_models_from_nlp_config({"nlp_engine_name": "spacy"})
+
+
+def _write_context_enhancer_analyzer_conf(
+    tmp_path, context_aware_enhancer=None, nlp_engine_name="spacy"
+):
+    model_name = "en_core_web_lg" if nlp_engine_name == "spacy" else "no_op"
+    configuration = {
+        "supported_languages": ["en"],
+        "nlp_configuration": {
+            "nlp_engine_name": nlp_engine_name,
+            "models": [{"lang_code": "en", "model_name": model_name}],
+        },
+        "recognizer_registry": {
+            "recognizers": [
+                {
+                    "name": "Ticket recognizer",
+                    "type": "custom",
+                    "supported_language": "en",
+                    "supported_entity": "TICKET_ID",
+                    "patterns": [
+                        {"name": "ticket", "regex": r"\b\d{6}\b", "score": 0.3}
+                    ],
+                    "context": ["ticket"],
+                }
+            ]
+        },
+    }
+    if context_aware_enhancer is not None:
+        configuration["context_aware_enhancer"] = context_aware_enhancer
+
+    analyzer_yaml = tmp_path / "analyzer_with_context_enhancer.yaml"
+    analyzer_yaml.write_text(yaml.safe_dump(configuration, sort_keys=False))
+    return analyzer_yaml
+
+
+def test_when_context_aware_enhancer_configured_then_values_reach_engine(tmp_path):
+    analyzer_yaml = _write_context_enhancer_analyzer_conf(
+        tmp_path,
+        context_aware_enhancer={
+            "context_suffix_count": 3,
+            "context_matching_mode": "whole_word",
+        },
+    )
+
+    engine = AnalyzerEngineProvider(analyzer_yaml).create_engine()
+
+    enhancer = engine.context_aware_enhancer
+    assert isinstance(enhancer, LemmaContextAwareEnhancer)
+    assert enhancer.context_suffix_count == 3
+    assert enhancer.context_matching_mode == "whole_word"
+    # Omitted fields keep the constructor defaults
+    assert enhancer.context_similarity_factor == 0.35
+    assert enhancer.min_score_with_context_similarity == 0.4
+    assert enhancer.context_prefix_count == 5
+
+
+def test_when_context_aware_enhancer_section_absent_then_engine_uses_defaults(
+    tmp_path,
+):
+    analyzer_yaml = _write_context_enhancer_analyzer_conf(tmp_path)
+
+    provider = AnalyzerEngineProvider(analyzer_yaml)
+    assert provider._load_context_aware_enhancer() is None
+    engine = provider.create_engine()
+
+    enhancer = engine.context_aware_enhancer
+    assert isinstance(enhancer, LemmaContextAwareEnhancer)
+    assert enhancer.context_similarity_factor == 0.35
+    assert enhancer.min_score_with_context_similarity == 0.4
+    assert enhancer.context_prefix_count == 5
+    assert enhancer.context_suffix_count == 0
+    assert enhancer.context_matching_mode == "substring"
+
+
+def test_when_context_suffix_count_configured_then_suffix_context_boosts_score(
+    tmp_path,
+):
+    text = "Use 123456 as your ticket"
+
+    default_yaml = _write_context_enhancer_analyzer_conf(tmp_path)
+    default_engine = AnalyzerEngineProvider(default_yaml).create_engine()
+    default_results = default_engine.analyze(
+        text=text, language="en", entities=["TICKET_ID"]
+    )
+
+    suffix_yaml = _write_context_enhancer_analyzer_conf(
+        tmp_path,
+        context_aware_enhancer={"context_prefix_count": 0, "context_suffix_count": 3},
+    )
+    suffix_engine = AnalyzerEngineProvider(suffix_yaml).create_engine()
+    suffix_results = suffix_engine.analyze(
+        text=text, language="en", entities=["TICKET_ID"]
+    )
+
+    assert len(default_results) == 1
+    assert default_results[0].score == pytest.approx(0.3)
+    assert len(suffix_results) == 1
+    assert suffix_results[0].score == pytest.approx(0.65)
+
+
+def test_when_context_aware_enhancer_configured_with_no_op_engine_then_warns(
+    tmp_path,
+):
+    analyzer_yaml = _write_context_enhancer_analyzer_conf(
+        tmp_path,
+        context_aware_enhancer={"context_suffix_count": 3},
+        nlp_engine_name="no_op",
+    )
+
+    with pytest.warns(UserWarning, match="NoOpNlpEngine"):
+        AnalyzerEngineProvider(analyzer_yaml).create_engine()
+
+
+def test_when_context_aware_enhancer_absent_with_no_op_engine_then_no_warning(
+    tmp_path,
+):
+    analyzer_yaml = _write_context_enhancer_analyzer_conf(
+        tmp_path, nlp_engine_name="no_op"
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        AnalyzerEngineProvider(analyzer_yaml).create_engine()
+
+
+def test_when_context_aware_enhancer_section_invalid_then_provider_raises(tmp_path):
+    analyzer_yaml = _write_context_enhancer_analyzer_conf(
+        tmp_path, context_aware_enhancer={"context_suffix_cnt": 3}
+    )
+
+    with pytest.raises(ValueError, match="context_suffix_cnt"):
+        AnalyzerEngineProvider(analyzer_yaml)

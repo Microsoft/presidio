@@ -1,6 +1,13 @@
 supported_languages: 
   - en
 default_score_threshold: 0
+# Optional: tune the context-aware enhancer. Omitted keys keep their defaults.
+# context_aware_enhancer:
+#   context_similarity_factor: 0.35
+#   min_score_with_context_similarity: 0.4
+#   context_prefix_count: 5
+#   context_suffix_count: 0
+#   context_matching_mode: substring # or whole_word
 nlp_configuration:
   nlp_engine_name: spacy
   models:
