@@ -17,9 +17,16 @@ class CreditCardRecognizer(PatternRecognizer):
     """
 
     PATTERNS = [
+        # Prefix branches cover the major issuer ranges, including the
+        # Mastercard 2-series BINs (first four digits 2221-2720, live since
+        # 2017) via the 2(22[1-9]|2[3-9]\d|[3-6]\d\d|7[01]\d|720) alternative.
+        # The final group accepts up to 7 digits so the pattern spans 13-19
+        # digit PANs (ISO/IEC 7812 allows up to 19, e.g. UnionPay/Maestro).
+        # Luhn (validate_result) still gates every match, so widening the
+        # range does not flag non-card numbers.
         Pattern(
             "All Credit Cards (weak)",
-            r"\b(?!1\d{12}(?!\d))((4\d{3})|(5[0-5]\d{2})|(6\d{3})|(1\d{3})|(3\d{3}))[- ]?(\d{3,4})[- ]?(\d{3,4})[- ]?(\d{3,5})\b",  # noqa: E501
+            r"\b(?!1\d{12}(?!\d))((4\d{3})|(5[0-5]\d{2})|(2(22[1-9]|2[3-9]\d|[3-6]\d\d|7[01]\d|720))|(6\d{3})|(1\d{3})|(3\d{3}))[- ]?(\d{3,4})[- ]?(\d{3,4})[- ]?(\d{3,7})\b",  # noqa: E501
             0.3,
         ),
     ]
