@@ -647,3 +647,11 @@ recognizers:
     type: predefined
     enabled: false
     country_code: ca
+
+  - name: CaBnRecognizer
+    supported_languages:
+    - en
+    - fr
+    type: predefined
+    enabled: false
+    country_code: ca
