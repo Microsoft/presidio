@@ -72,6 +72,26 @@ def validate_type(parameter_value, parameter_name, parameter_type):
         raise InvalidParamError(message)
 
 
+def validate_type_strict(parameter_value, parameter_name, parameter_type) -> None:
+    """
+    Validate the type of a parameter whose falsy values are still meaningful.
+
+    :func:`validate_type` skips the check when the value is falsy, which is
+    what optional string and numeric parameters want. A boolean parameter
+    cannot use it: ``0``, ``""`` and ``[]`` would pass and then be read as
+    ``False``, so a caller who wrote ``"deterministic": 0`` in JSON would
+    silently get the opposite of a validation error. ``None`` still means
+    "not supplied" and passes.
+    """
+    if parameter_value is not None and not isinstance(parameter_value, parameter_type):
+        message = _get_bad_typed_parameter_error_message(
+            parameter_name,
+            expected_type=parameter_type,
+            actual_type=type(parameter_value),
+        )
+        raise InvalidParamError(message)
+
+
 def _get_bad_typed_parameter_error_message(parameter_name, expected_type, actual_type):
     type_to_json_type = {
         str: "string",

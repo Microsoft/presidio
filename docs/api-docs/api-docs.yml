@@ -705,6 +705,11 @@ components:
           type: string
           description: "Cryptographic key of length 128, 192 or 256 bits, in a string format"
           example: "3t6w9z$C&F)J@NcR"
+        deterministic:
+          type: boolean
+          description: "Whether the same value should always encrypt to the same result. Preserves referential integrity across a dataset, at the cost of revealing which values are equal"
+          example: false
+          default: false
 
     Decrypt:
       title: Decrypt

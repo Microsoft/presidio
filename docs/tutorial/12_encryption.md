@@ -81,3 +81,31 @@ encrypted_entity_value = anonymize_result.items[0].text
 # Restore the original entity value
 Decrypt().operate(text=encrypted_entity_value, params={"key": crypto_key})
 ```
+
+## Optional: deterministic encryption for referential integrity
+
+By default, each entity is encrypted with a random initialization vector, so the same value encrypts to a different result every time. If you need the same value to always encrypt to the same result - for example to keep a joinable key across records - opt in with `deterministic`:
+
+<!--pytest-codeblocks:skip-->
+```python
+engine = AnonymizerEngine()
+
+anonymize_result = engine.anonymize(
+    text="My name is James Bond, and James Bond is my name",
+    analyzer_results=[
+        RecognizerResult(entity_type="PERSON", start=11, end=21, score=0.8),
+        RecognizerResult(entity_type="PERSON", start=27, end=37, score=0.8),
+    ],
+    operators={
+        "PERSON": OperatorConfig("encrypt", {"key": crypto_key, "deterministic": True})
+    },
+)
+
+# Both occurrences of "James Bond" are now the same encrypted value
+anonymize_result.text
+```
+
+Decryption is unchanged: the same `decrypt` operator and the same key restore the original value.
+
+!!! warning "This is a deliberate trade-off"
+    Deterministic encryption reveals which entities hold the same value, and how often each value appears. Use it only when referential integrity is a requirement, and leave `deterministic` out everywhere else.

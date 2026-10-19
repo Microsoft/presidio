@@ -59,6 +59,33 @@ def test_given_short_key_then_we_fail():
         )
 
 
+def test_given_deterministic_encrypt_then_repeated_pii_shares_one_decryptable_value():
+    key = "WmZq4t7w!z%C&F)J"
+    text = "My name is Chloë and not Chloë"
+    analyzer_results = [
+        RecognizerResult("PERSON", 11, 16, 0.8),
+        RecognizerResult("PERSON", 25, 30, 0.8),
+    ]
+    anonymizers_config = {
+        "PERSON": OperatorConfig("encrypt", {"key": key, "deterministic": True})
+    }
+
+    anonymized = AnonymizerEngine().anonymize(
+        text, analyzer_results, anonymizers_config
+    )
+
+    # Referential integrity: both occurrences encrypt to the same value.
+    assert anonymized.items[0].text == anonymized.items[1].text
+
+    decryption = DeanonymizeEngine().deanonymize(
+        anonymized.text,
+        anonymized.items,
+        {"DEFAULT": OperatorConfig(Decrypt.NAME, {"key": key})},
+    )
+
+    assert decryption.text == text
+
+
 def test_given_anonymize_with_encrypt_then_text_returned_with_encrypted_content():
     unencrypted_text = "My name is "
     expected_encrypted_text = "Chloë"

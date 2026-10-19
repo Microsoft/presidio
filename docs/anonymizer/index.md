@@ -242,7 +242,7 @@ of the AnalyzerEngine"
 | Anonymize     | redact        | Remove the PII completely from text                                 | None                                                                                                                                                                                              |
 | Anonymize     | hash          | Hashes the PII text using salted hashing for security              | `hash_type`: sets the type of hashing. Can be either `sha256` or `sha512`. The default is `sha256`.<br>`salt`: Optional salt for reproducible hashing. If not provided, a random salt is generated per entity to prevent brute-force attacks. To maintain referential integrity across records/calls, provide a consistent salt (see example below). |
 | Anonymize     | mask          | Replace the PII with a given character                              | `chars_to_mask`: the amount of characters out of the PII that should be replaced. <br> `masking_char`: the character to be replaced with. <br> `from_end`: Whether to mask the PII from it's end. |
-| Anonymize     | encrypt       | Encrypt the PII using a given key                                   | `key`: a cryptographic key used for the encryption.                                                                                                                                               |
+| Anonymize     | encrypt       | Encrypt the PII using a given key                                   | `key`: a cryptographic key used for the encryption.<br>`deterministic`: Optional. `false` by default, which encrypts the same value differently every time. Set it to `true` to make the same value always encrypt to the same ciphertext, which preserves referential integrity but reveals which values are equal (see example below). |
 | Anonymize     | custom        | Replace the PII with the result of the function executed on the PII | `lambda`: lambda to execute on the PII data. The lambda return type must be a string.                                                                                                             |
 | Anonymize     | surrogate_ahds | Generate realistic, medically-appropriate surrogates using Azure Health Data Services de-identification service surrogation | `endpoint`: AHDS endpoint (optional, uses AHDS_ENDPOINT env var)<br>`entities`: List of entities detected by analyzer<br>`input_locale`: Input locale (default: "en-US")<br>`surrogate_locale`: Surrogate locale (default: "en-US")<br>Requires: `pip install presidio-anonymizer[ahds]` |
 | Anonymize     | keep          | Preserver the PII unmodified                                        | None                                                                                                                                                                                              |
@@ -305,6 +305,60 @@ print(result.text)
     - Use a salt of at least 128 bits (16 bytes) - enforced by the operator
     - Never include the salt in anonymized output
     - For maximum security without referential integrity needs, omit the salt parameter to use random per-entity salts
+
+### Deterministic encryption for referential integrity
+
+By default the `encrypt` operator draws a random IV for every entity, so the same PII
+value encrypts to a different value on every call. Set `deterministic` to `true` to
+derive the IV from the key and the value instead, so that equal values always produce
+equal ciphertexts and references across records or calls are preserved:
+
+```python
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import RecognizerResult, OperatorConfig
+
+# Store this key securely and reuse it across calls
+crypto_key = "WmZq4t7w!z%C&F)J"
+
+engine = AnonymizerEngine()
+text = "John Doe called John Doe yesterday"
+analyzer_results = [
+    RecognizerResult(start=0, end=8, score=0.8, entity_type="PERSON"),
+    RecognizerResult(start=16, end=24, score=0.8, entity_type="PERSON"),
+]
+
+result = engine.anonymize(
+    text,
+    analyzer_results,
+    {"DEFAULT": OperatorConfig("encrypt", {"key": crypto_key, "deterministic": True})},
+)
+
+# Both "John Doe" occurrences are replaced by the same encrypted value
+print(result.text)
+```
+
+The IV is a synthetic IV: an HMAC-SHA256 of the value, truncated to 16 bytes, keyed with a
+subkey derived from the encryption key rather than with the encryption key itself — the key
+that drives AES does not also produce a value published in the clear, which is the same
+separation RFC 5297 makes for SIV mode. It is deliberately not a plain hash of the value,
+which anyone could recompute to confirm a guess; only a holder of the key can reproduce it.
+The output format does not change, so `decrypt` restores deterministically encrypted values
+exactly as it restores randomly encrypted ones.
+
+!!! warning "Deterministic encryption leaks equality"
+    - Identical values produce identical ciphertexts **by design**. Anyone holding the
+      output can tell which entities share a value, count how often each value occurs,
+      and match those frequencies against a known population.
+    - Use it only where referential integrity is an actual requirement, and keep the
+      default (omit `deterministic`, or set it to `false`) everywhere else.
+    - Keep `deterministic` consistent across calls for the same key. Mixing the two modes
+      produces both stable and random ciphertexts for the same value, so the references
+      will not line up.
+    - `encrypt` is AES-CBC without a MAC in either mode, so a ciphertext is confidential
+      but not authenticated: a party who can modify stored values can alter them
+      undetectably, and `decrypt` will return whatever comes out. That is unchanged by
+      this option, but it is worth knowing before ciphertexts become dataset keys that
+      other systems join on.
 
 ## Handling overlaps between entities
 

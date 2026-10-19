@@ -62,6 +62,10 @@ The **Anonymizer** default setting is to use the Advanced Encryption Standard (A
 -  Parameters:
     - `key`: A cryptographic key used for the encryption. 
       The length of the key needs to be of 128, 192 or 256 bits, in a string format.
+    - `deterministic`: Optional boolean, `false` by default. When `true`, the same
+      text always encrypts to the same value, which keeps references across a dataset
+      intact. It reveals which entities share a value and how often each value occurs,
+      so turn it on only where referential integrity is an actual requirement.
 
 Note: If the default anonymizer is not provided, 
 the default anonymizer is "replace" for all entities. 
