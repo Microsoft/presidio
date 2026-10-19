@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### TCK
+#### Added
+- Added Technology Compatibility Kit (TCK) for deterministic recognizers as a portable YAML test suite (74 recognizers, 1478 test cases)
+
 ### Analyzer
 #### Added
 - Added `UuidRecognizer` (generic, entity type `UUID`) to detect UUIDs in the standard 8-4-4-4-12 hyphenated hexadecimal format, covering RFC 4122 versions 1-5 and RFC 9562 versions 6-8. Validates version and variant nibbles and filters the nil UUID to reduce false positives.

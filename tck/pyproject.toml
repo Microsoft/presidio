@@ -1,0 +1,47 @@
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
+
+[project]
+name = "presidio-tck"
+version = "0.0.1"
+description = "Technology Compatibility Kit for Presidio PII recognizers"
+license = "MIT"
+requires-python = ">=3.10,<3.15"
+authors = [
+    {name = "Presidio", email = "presidio@dataprivacystack.org"},
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "presidio-analyzer (>=2.2.364)",
+    "pyyaml (>=6.0)",
+    "pytest (>=7.0)",
+]
+
+[project.urls]
+Homepage = "https://github.com/data-privacy-stack/presidio"
+
+[dependency-groups]
+dev = [
+    "pip",
+    "ruff",
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "python-dotenv",
+    "pre-commit",
+    "diff-cover",
+]
+
+[tool.coverage.run]
+relative_files = true
+source = ["."]

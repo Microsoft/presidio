@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/microsoft/presidio/tck/schema/tck-recognizer-tests.schema.json",
+  "title": "Presidio Recognizer TCK",
+  "description": "Technology Compatibility Kit test data for a single PII recognizer",
+  "type": "object",
+  "required": ["recognizer", "entity_type", "language", "test_cases"],
+  "properties": {
+    "recognizer": {
+      "type": "string",
+      "description": "Recognizer class name, e.g. CreditCardRecognizer"
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "PII entity type, e.g. CREDIT_CARD"
+    },
+    "language": {
+      "type": "string",
+      "description": "ISO 639-1 language code, e.g. en",
+      "pattern": "^[a-z]{2}$"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "ISO 3166-1 alpha-2 country code, e.g. us",
+      "pattern": "^[a-z]{2}$"
+    },
+    "test_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["input"],
+        "oneOf": [
+          {"required": ["expected"]},
+          {"required": ["expected_count"]}
+        ],
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "Text input to analyze"
+          },
+          "expected_count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Expected number of detections (count-only assertion, no position check)"
+          },
+          "expected": {
+            "type": "array",
+            "description": "Expected detections. Empty array means no match expected (negative test case).",
+            "items": {
+              "type": "object",
+              "required": ["start", "end"],
+              "properties": {
+                "start": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Start character offset (inclusive)"
+                },
+                "end": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "End character offset (exclusive)"
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0,
+                  "description": "Exact expected confidence score"
+                },
+                "score_min": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0,
+                  "description": "Minimum expected confidence score (inclusive)"
+                },
+                "score_max": {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 1.0,
+                  "description": "Maximum expected confidence score (inclusive)"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

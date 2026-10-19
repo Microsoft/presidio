@@ -46,22 +46,38 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     needs: get-version
     permissions:
       contents: write
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
         with:
           persist-credentials: false
 
-      - name: Create GitHub Release       
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: python -m pip install uv==0.11.6
+
+      - name: Generate and package TCK data
+        working-directory: tck
+        run: |
+          uv sync --locked --group dev
+          uv run python extract_tck.py
+          tar -czf "../presidio-tck-${{ needs.get-version.outputs.version }}.tar.gz" data
+
+      - name: Create GitHub Release
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ needs.get-version.outputs.version }}" \
+            "presidio-tck-${{ needs.get-version.outputs.version }}.tar.gz" \
             --title "Release ${{ needs.get-version.outputs.version }}" \
             --notes "" \
             --draft \
