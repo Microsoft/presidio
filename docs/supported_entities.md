@@ -178,6 +178,13 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
 | PH_UMID    | Philippine Unified Multi-Purpose ID (UMID) / Common Reference Number (CRN). 12-digit format (e.g., 0111-1234567-8). Acts as a master ID connecting SSS, GSIS, PhilHealth, and Pag-IBIG. Disabled by default. | Pattern match and context |
 
+### France
+
+| Entity Type | Description | Detection Method |
+| --- | --- | --- |
+| FR_SIREN | French SIREN: 9-digit identifier assigned by INSEE to every natural or legal person entered in the Sirene register, self-employed persons included. The last digit is a Luhn check digit. | Pattern match, context and checksum |
+| FR_SIRET | French SIRET: 14-digit identifier assigned by INSEE to every establishment, made of the SIREN and a 5-digit NIC. The last digit is a Luhn check digit; establishments of La Poste follow a specific rule. | Pattern match, context and checksum |
+
 ### Germany
 
 | Entity Type | Description | Detection Method |

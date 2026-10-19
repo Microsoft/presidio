@@ -647,3 +647,19 @@ recognizers:
     type: predefined
     enabled: false
     country_code: ca
+
+  - name: FrSirenRecognizer
+    supported_languages:
+    - fr
+    - en
+    type: predefined
+    enabled: false
+    country_code: fr
+
+  - name: FrSiretRecognizer
+    supported_languages:
+    - fr
+    - en
+    type: predefined
+    enabled: false
+    country_code: fr
