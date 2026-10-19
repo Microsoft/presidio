@@ -256,10 +256,14 @@ def test_hf_recognizer_load_errors():
         with pytest.raises(ImportError):
             HuggingFaceNerRecognizer(model_name="test")
 
-    # 2. Test ValueError when model_name is missing
-    with patch(path, new=MagicMock()):
-        with pytest.raises(ValueError, match="model_name must be set"):
-            HuggingFaceNerRecognizer(model_name=None)
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_analyze_without_model_name_raises_with_configuration_pointer():
+    """Verify calling analyze() on HuggingFaceNerRecognizer without model_name raises ValueError with configuration pointer."""
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        recognizer = HuggingFaceNerRecognizer(model_name=None)
+        with pytest.raises(ValueError, match="default_recognizers.yaml"):
+            recognizer.analyze("Some text to analyze", ["PERSON"])
 
 
 @pytest.mark.usefixtures("mock_torch_installed")
@@ -723,3 +727,13 @@ def test_hf_recognizer_resolves_deferred_tokenizer_chunker(mock_pipeline):
     assert chunker.tokenizer is mock_tokenizer
     assert chunker.max_tokens == 128
     assert chunker.overlap_tokens == 16
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_registry_builds_with_huggingface_entry_enabled():
+    """Verify HuggingFaceNerRecognizer can be instantiated without model_name during registry build."""
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        recognizer = HuggingFaceNerRecognizer()
+        assert recognizer.model_name is None
+        assert recognizer.ner_pipeline is None
+

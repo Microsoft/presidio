@@ -607,15 +607,11 @@ def test_yaml_country_code_blank_value_raises():
 LOADER_KWARGS = ("name", "supported_language")
 
 # Entries that cannot load from their shipped configuration even with every
-# dependency installed, so the load test below cannot cover them.
-#
-# ``HuggingFaceNerRecognizer``: ``EntityRecognizer.__init__`` calls ``load()``
-# unconditionally and ``load()`` requires ``model_name``, which the shipped
-# entry does not supply -- it raises ValueError once ``transformers`` and
-# ``torch`` are present. That is a pre-existing defect in the entry, not
-# something this contract can assert away, and adding ``model_name`` here would
-# make the test download a model. It stays covered by the resolve test.
-NOT_LOADABLE_FROM_SHIPPED_ENTRY = {"HuggingFaceNerRecognizer"}
+# dependency installed, so the load test below cannot cover them. Empty today:
+# ``HuggingFaceNerRecognizer`` used to sit here because ``load()`` raised when the
+# shipped entry supplied no ``model_name``. It now defers loading instead, so the
+# load test covers it like every other entry.
+NOT_LOADABLE_FROM_SHIPPED_ENTRY: set[str] = set()
 
 # Entries gated behind an optional dependency, for which refusing to load with an
 # actionable ImportError is the intended behavior. The skip is scoped to these

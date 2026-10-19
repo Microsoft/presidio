@@ -257,17 +257,13 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
         This method handles:
         1. Hardware acceleration setup (CUDA validation and fallback)
         2. Lazy-loading of the heavyweight ML pipeline.
-
-        :raises ValueError: If model_name is not set
         """
         if self.ner_pipeline is not None:
             return
 
         if not self.model_name:
-            raise ValueError(
-                "model_name must be set before calling load(). "
-                "Pass it to __init__() or set it directly."
-            )
+            logger.info("model_name is not set. Deferring HuggingFace model loading.")
+            return
 
         # Device validation and fallback
         device = self.device
@@ -429,6 +425,13 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
 
         # Defensive guard for entities input
         entities = entities or []
+
+        if not self.model_name:
+            raise ValueError(
+                "model_name must be specified to analyze text using "
+                "HuggingFaceNerRecognizer. Specify model_name when instantiating "
+                "HuggingFaceNerRecognizer or in default_recognizers.yaml."
+            )
 
         if not self.ner_pipeline:
             self.load()
