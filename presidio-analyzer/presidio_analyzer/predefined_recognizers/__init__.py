@@ -82,6 +82,7 @@ from .country_specific.philippines.ph_tin_recognizer import PhTinRecognizer
 from .country_specific.philippines.ph_umid_recognizer import PhUmidRecognizer
 
 # Poland recognizers
+from .country_specific.poland.pl_nip_recognizer import PlNipRecognizer
 from .country_specific.poland.pl_pesel_recognizer import PlPeselRecognizer
 
 # Singapore recognizers
@@ -270,6 +271,7 @@ __all__ = [
     "HuggingFaceNerRecognizer",
     "PhTinRecognizer",
     "PlPeselRecognizer",
+    "PlNipRecognizer",
     "PhUmidRecognizer",
     "AzureAILanguageRecognizer",
     "InAadhaarRecognizer",

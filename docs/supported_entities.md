@@ -79,6 +79,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |Entity Type|Description|Detection Method|
 |--- |--- |--- |
 |PL_PESEL|Polish PESEL number|Pattern match, context and checksum|
+|PL_NIP|The Polish tax identification number (NIP, Numer Identyfikacji Podatkowej) is a 10-digit number assigned to businesses, legal entities and VAT-registered individuals. Matched as 10 digits or grouped with hyphens (123-456-32-18, 123-45-63-218), also after the VAT-EU prefix PL.|Pattern match, context and checksum|
 
 ### Singapore
 

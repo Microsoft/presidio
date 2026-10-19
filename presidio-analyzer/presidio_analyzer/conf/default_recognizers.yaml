@@ -328,6 +328,13 @@ recognizers:
     type: predefined
     country_code: pl
 
+  - name: PlNipRecognizer
+    supported_languages:
+    - pl
+    type: predefined
+    enabled: false
+    country_code: pl
+
   - name: FiPersonalIdentityCodeRecognizer
     supported_languages:
     - fi
