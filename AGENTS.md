@@ -8,8 +8,8 @@ working. Correctness and backward compatibility outrank cleverness.
 
 The review-side versions of these rules — which the Copilot PR review agent
 also enforces — live in `.github/copilot-instructions.md` and
-`.github/instructions/*.instructions.md`. Follow them at authoring time so the
-review finds nothing.
+`.github/instructions/*.instructions.md`. Follow them at authoring time;
+the pre-PR check below verifies this for you.
 
 ## Working in this repo
 
@@ -26,9 +26,19 @@ uv run ruff check . && uv run ruff format .
   package's `pyproject.toml` dependencies, run `uv lock` in that package and
   commit the updated `uv.lock` in the same change — CI fails on drift.
 - Do not edit `CHANGELOG.md`; release entries are generated from merged PRs.
+- PRs need >= 90% test coverage on changed lines; a bot reports it on the PR.
 - Never log PII values (`entity.text`) — only entity types and positions.
 - Modules that process records are stateless; do not add state.
 - Terminology: "threshold", not "cutoff"; ISO 639-1 language codes everywhere.
+
+## Before opening a PR
+
+Check your branch against this file and `.github/instructions/`, run Ruff and
+the nearest tests, and fix what is missing. The same check is run on review.
+
+- Claude Code: run `/review-pr` from your branch. The skill lives in
+  `.claude/skills/review-pr/`.
+- Others: follow the steps in `.claude/skills/review-pr/SKILL.md` manually.
 
 ## Adding a PII recognizer
 
@@ -42,7 +52,10 @@ workflow, in order:
    country name for new country directories (`south_africa`, not `za`;
    don't imitate the pre-existing short forms `us`/`uk`/`thai`), or
    `generic/`, `nlp_engine_recognizers/`, `ner/`, `third_party/` as
-   appropriate.
+   appropriate. Country-specific classes set `COUNTRY_CODE` to the
+   directory's ISO 3166-1 alpha-2 code (`uk` for the United Kingdom
+   directory); the YAML entry mirrors it as `country_code` and the loader
+   refuses to load on mismatch.
 2. **Use ISO 639-1 language codes** (`ko` for Korean, never `kr`) — a
    mismatch loads nothing, silently.
 3. **Make the constructor loader-compatible**: accept the YAML loader's
@@ -114,3 +127,24 @@ touching the layer**. The short version:
 - **Docs move with code**: `docs/supported_entities.md` for entities,
   `docs/api-docs/api-docs.yml` for API changes, reST docstrings on public
   APIs, samples for complex features.
+
+## Code quality bar
+
+Reviewers hold PRs to this, not only to correctness.
+
+- Simple over complete. Code should be readable top to bottom by someone new to
+  the module. If a complete solution is hard to follow and a simpler one covers
+  the real requirement, propose the simpler one and say what it leaves out.
+- Fix at the source. Do not infer state or intent from indirect signals when the
+  source can expose it directly. A wider change is preferred over a workaround;
+  if the right fix is out of scope, say so in the PR rather than narrowing it.
+- Easy to extend. A new case, entity, or format should need a change in one
+  predictable place. Introduce an abstraction only when there are two real uses.
+- Impact on accuracy. If the change might reduce detection accuracy (missed PII,
+  likely false positives, changed scores for existing inputs), say so in the PR
+  description and explain the trade-off.
+- Tests cover behavior at the public boundary. No tests of log text, message
+  wording, private helpers, or mock calls. One test per behavior.
+- Docstrings: public APIs get a summary and full `:param:` list; no docstring
+  describes implementation. Docs are high-level, plain language, no
+  parameter-by-parameter detail.

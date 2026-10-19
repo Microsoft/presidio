@@ -138,8 +138,11 @@ docs and configuration examples.
   cross-component breaks, missing tests → 💡 code quality.
 
 **Do not flag** (automated tools own these): formatting, line length, import
-order (Ruff); type-hint style (`List[str]` vs `list[str]`); style preferences
-or speculative abstractions that don't fix bugs or improve accuracy.
+order (Ruff); type-hint style (`List[str]` vs `list[str]`).
+
+Readability, design, and test scope are reviewed against the "Code quality
+bar" section of `AGENTS.md`. Flag violations of it at 💡 severity, with the
+concrete simplification proposed.
 
 ## Repository Context
 
@@ -165,6 +168,6 @@ uv run ruff check . && uv run ruff format .
 docker compose up --build -d && cd e2e-tests && pytest -v
 ```
 
-Reference docs: `CONTRIBUTING.md`, `docs/development.md`,
+Reference docs: `AGENTS.md`, `CONTRIBUTING.md`, `docs/development.md`,
 `docs/analyzer/adding_recognizers.md`, `docs/analyzer/developing_recognizers.md`,
 `docs/anonymizer/adding_operators.md`.

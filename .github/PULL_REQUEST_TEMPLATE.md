@@ -14,3 +14,5 @@ Fixes #XX
 - [ ] My code includes unit tests
 - [ ] All unit tests and lint checks pass locally
 - [ ] My PR contains documentation updates / additions if required
+- [ ] My PR description states any change to existing behavior and any possible impact on detection accuracy
+- [ ] If I added or changed a recognizer, it has a test that enables it in a YAML configuration and loads it through `RecognizerRegistryProvider`

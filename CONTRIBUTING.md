@@ -24,6 +24,8 @@ By submitting a contribution, you represent that you have the legal right to con
 
 Commit message should be clear, explaining the committed changes.
 
+Presidio is a library: users depend on current detection behavior. If your change alters existing behavior (for example patterns, scores, defaults, or which entities are returned) or may reduce detection accuracy, say so in the PR description and explain the trade-off.
+
 Do not update `CHANGELOG.md` as part of your PR. Before each version bump, the
 changelog entries for the current release are generated from merged PRs.
 Per-PR changelog edits create unnecessary merge conflicts with other contributions.
@@ -51,18 +53,18 @@ Best practices for developing recognizers [are described here](docs/analyzer/dev
 To contribute a new predefined recognizer to Presidio Analyzer:
 
 1. **Choose the correct folder:**
-   - If your recognizer is specific to a country or region, add it under `presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/<country>/`.
+   - If your recognizer is specific to a country or region, add it under `presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/<country>/`. New country directories use the full lowercase country name (`south_africa`, `philippines`). Some older directories use short forms (`us`, `uk`, `thai`); do not add new ones.
    - For globally applicable recognizers, use `generic/`.
    - For recognizers based on NLP engines, use `nlp_engine_recognizers/`.
    - For standalone NER models, use `ner/`.
    - For third-party integrations, use `third_party/`.
 
-
 2. **Add your recognizer class** in the appropriate folder.
 
+   - Use ISO 639-1 language codes for `supported_language` (`ko` for Korean, not `kr`). A wrong code makes the recognizer load nothing, with no error.
    - **If your recognizer uses regex patterns:**
-     - Make regex patterns as specific as possible to minimize false positives.
-     - Document the source or reference for any new regex logic (e.g., link to a standard, documentation, or example dataset) in the code as a comment.
+     - Make regex patterns as specific as possible to minimize false positives, and set the pattern score to how specific the pattern is on its own. Compare with existing recognizers of similar strength.
+     - Document the source of the pattern (the official standard, specification, or reference it comes from) and the validation algorithm if any in the class docstring.
    - **If your recognizer is country-specific (lives under `country_specific/<country>/`):**
      - Declare its country by setting the class-level `COUNTRY_CODE = "<iso-3166-1-alpha-2>"` attribute (e.g. `COUNTRY_CODE = "us"` for US recognizers, `"de"` for Germany). This is what powers `RecognizerRegistry.load_predefined_recognizers(countries=[...])`. See [Filtering recognizers by country](docs/analyzer/filtering_by_country.md) for details.
      - The `COUNTRY_CODE` value should match the directory's country: e.g. anything under `country_specific/us/` declares `"us"`, anything under `country_specific/de/` declares `"de"`. Use `"uk"` (not `"gb"`) for the United Kingdom directory to stay consistent with the existing layout.
@@ -71,18 +73,17 @@ To contribute a new predefined recognizer to Presidio Analyzer:
 3. **Add your recognizer to the configuration:**
    - Add your recognizer to `presidio-analyzer/presidio_analyzer/conf/default_recognizers.yaml`.
    - For country-specific recognizers, also declare `country_code: <iso>` on the YAML entry to mirror the class-level `COUNTRY_CODE`. The loader cross-checks the two and refuses to load on mismatch, so the YAML stays a discoverable record of the country tag for no-code users.
-   - For country-specific recognizers, set `enabled: false` by default in the YAML configuration.
+   - Country-specific recognizers ship with `enabled: false`. Generic recognizers may ship with `enabled: true` only when their false-positive rate is low; justify this in the PR description.
 
-3. **Update imports:** Add your recognizer to `presidio-analyzer/presidio_analyzer/predefined_recognizers/__init__.py` so it is available for import and backward compatibility.
-
-4. **Update `__all__`:** Add your recognizer class name to the `__all__` list in the same `__init__.py` file.
+4. **Update imports and `__all__`:** Export your recognizer from `presidio-analyzer/presidio_analyzer/predefined_recognizers/__init__.py` and from the country or category `__init__.py`, and add the class name to `__all__`.
 
 5. **Testing:**
    - Ensure all existing tests pass.
-   - Add or update tests for your new recognizer.
+   - Add tests for your recognizer: assert exact scores and exact entity boundaries, include values embedded in surrounding text, include a plausible non-PII value of the same shape that must not be detected, and show that context words change the score if the recognizer defines any.
+   - Add at least one test that enables the recognizer in a YAML configuration and loads it through `RecognizerRegistryProvider`. This is how users reach it, and it catches constructor and registration problems that direct construction hides. For non-English recognizers, set the top-level `supported_languages` in the test configuration; it defaults to `["en"]` and filters other languages silently.
 
 6. **Documentation:**
-   - If your recognizer supports a new entity, consider updating the [supported entities list](docs/supported_entities.md).
+   - Add a row for the new entity to the [supported entities list](docs/supported_entities.md).
    - Follow the [best practices for recognizer development](docs/analyzer/developing_recognizers.md) and [adding recognizers](docs/analyzer/adding_recognizers.md).
 
 ### Fixing Bugs and improving the code
