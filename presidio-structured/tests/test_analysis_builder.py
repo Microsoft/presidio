@@ -32,6 +32,23 @@ def test_generate_analysis_tabular_with_invalid_sampling(tabular_analysis_builde
         tabular_analysis_builder.generate_analysis(sample_df, n=-1)
 
 
+def test_generate_analysis_tabular_default_strategy_detects_email_address(
+    tabular_analysis_builder, sample_df_strategy
+):
+    # Regression test for #1316: with the default strategy, a column of email
+    # addresses was misidentified as URL, because the confidence-blind
+    # most_common vote let six URL detections at 0.5 beat three EMAIL_ADDRESS
+    # detections at 1.0. The default mixed strategy must prefer the confident
+    # detection.
+    structured_analysis = tabular_analysis_builder.generate_analysis(
+        sample_df_strategy
+    )
+
+    assert structured_analysis.entity_mapping["name"] == "PERSON"
+    assert structured_analysis.entity_mapping["email"] == "EMAIL_ADDRESS"
+    assert structured_analysis.entity_mapping["city"] == "LOCATION"
+
+
 def test_find_most_common_entity(tabular_analysis_builder, sample_df_strategy):
     key_recognizer_result_map = tabular_analysis_builder._generate_key_rec_results_map(
         sample_df_strategy, "en", selection_strategy="most_common"

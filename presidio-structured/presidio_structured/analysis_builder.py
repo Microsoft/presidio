@@ -172,7 +172,7 @@ class PandasAnalysisBuilder(TabularAnalysisBuilder):
         df: DataFrame,
         n: Optional[int] = None,
         language: str = "en",
-        selection_strategy: str = "most_common",
+        selection_strategy: str = "mixed",
         mixed_strategy_threshold: float = 0.5,
     ) -> StructuredAnalysis:
         """
@@ -182,7 +182,12 @@ class PandasAnalysisBuilder(TabularAnalysisBuilder):
         :param n: The number of samples to be taken from the dataframe.
         :param language: The language to be used for analysis.
         :param selection_strategy: A string that specifies the entity selection strategy
-        ('highest_confidence', 'mixed', or default to most common).
+        ('highest_confidence', 'mixed', or 'most_common'). Defaults to 'mixed':
+        the entity with the highest confidence is selected when its score exceeds
+        mixed_strategy_threshold, otherwise the most common entity is selected.
+        This keeps confident detections (e.g. an email address recognized at 1.0)
+        from losing to noisier, more frequent detections (e.g. URL fragments of
+        the same emails recognized at 0.5).
         :param mixed_strategy_threshold: A float value for the threshold to be used in
         the entity selection mixed strategy.
         :return: A StructuredAnalysis object containing the analysis results.
@@ -214,7 +219,7 @@ class PandasAnalysisBuilder(TabularAnalysisBuilder):
         self,
         df: DataFrame,
         language: str,
-        selection_strategy: str = "most_common",
+        selection_strategy: str = "mixed",
         mixed_strategy_threshold: float = 0.5,
     ) -> Dict[str, RecognizerResult]:
         """
@@ -225,7 +230,7 @@ class PandasAnalysisBuilder(TabularAnalysisBuilder):
         :param df: The dataframe where entities will be searched.
         :param language: Language to be used in the analysis engine.
         :param selection_strategy: A string that specifies the entity selection strategy
-        ('highest_confidence', 'mixed', or default to most common).
+        ('highest_confidence', 'mixed', or 'most_common'). Defaults to 'mixed'.
         :param mixed_strategy_threshold: A float value for the threshold to be used in
         the entity selection mixed strategy.
         :return: A dictionary mapping column names to the most common RecognizerResult.
@@ -274,7 +279,7 @@ class PandasAnalysisBuilder(TabularAnalysisBuilder):
         :param analyzer_results: A nested list of RecognizerResult objects from the
         analysis results.
         :param selection_strategy: A string that specifies the entity selection strategy
-        ('highest_confidence', 'mixed', or default to most common).
+        ('highest_confidence', 'mixed', or 'most_common').
         :return: A RecognizerResult object representing the selected entity based on the
         given strategy.
         """

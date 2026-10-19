@@ -112,17 +112,20 @@ A more detailed sample can be found here:
 
 #### Selection Strategy for Entity Detection in Tabular Data
 
-- **Most Common (default):**  Identifies the most frequently occurring PII entity in a data column or field.
+- **Most Common:**  Identifies the most frequently occurring PII entity in a data column or field.
 - **Highest Confidence:**  Selects PII entities based on the highest confidence scores, irrespective of their occurrence frequency.
-- **Mixed:**  Combines the strengths of both the above strategies. It selects the entity with the highest confidence score if that score exceeds a specified threshold (controlled by `mixed_strategy_threshold`); otherwise, it defaults to the most common entity.
+- **Mixed (default):**  Combines the strengths of both the above strategies. It selects the entity with the highest confidence score if that score exceeds a specified threshold (controlled by `mixed_strategy_threshold`); otherwise, it defaults to the most common entity. This keeps a confident detection (e.g. an email address recognized at 1.0) from losing to noisier, more frequent detections (e.g. URL fragments of the same emails recognized at 0.5).
 
 ##### Usage
 
 Specify the `selection_strategy` and optionally the `mixed_strategy_threshold` in the `generate_analysis()` method:
 
 ```python
-# Generate a tabular analysis using the most common strategy
+# Generate a tabular analysis using the default (mixed) strategy
 tabular_analysis = PandasAnalysisBuilder().generate_analysis(sample_df)
+
+# Generate a tabular analysis using the most common strategy
+tabular_analysis = PandasAnalysisBuilder().generate_analysis(sample_df, selection_strategy="most_common")
 
 # Generate a tabular analysis using the highest confidence strategy
 tabular_analysis = PandasAnalysisBuilder().generate_analysis(sample_df, selection_strategy="highest_confidence")
