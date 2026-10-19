@@ -1,0 +1,53 @@
+[1mdiff --git a/presidio-analyzer/presidio_analyzer/predefined_recognizers/__init__.py b/presidio-analyzer/presidio_analyzer/predefined_recognizers/__init__.py[m
+[1mindex 2bd2f57..be7214a 100644[m
+[1m--- a/presidio-analyzer/presidio_analyzer/predefined_recognizers/__init__.py[m
+[1m+++ b/presidio-analyzer/presidio_analyzer/predefined_recognizers/__init__.py[m
+[36m@@ -49,8 +49,8 @@[m [mfrom .country_specific.india.in_aadhaar_recognizer import InAadhaarRecognizer[m
+ from .country_specific.india.in_gstin_recognizer import InGstinRecognizer[m
+ from .country_specific.india.in_pan_recognizer import InPanRecognizer[m
+ from .country_specific.india.in_passport_recognizer import InPassportRecognizer[m
+[31m-from .country_specific.india.in_voter_recognizer import InVoterRecognizer[m
+ from .country_specific.india.in_upi_recognizer import InUpiRecognizer[m
+[32m+[m[32mfrom .country_specific.india.in_voter_recognizer import InVoterRecognizer[m
+ [m
+ # Italy recognizers[m
+ from .country_specific.italy.it_driver_license_recognizer import ([m
+[1mdiff --git a/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/__init__.py b/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/__init__.py[m
+[1mindex 1f2f6d6..795035a 100644[m
+[1m--- a/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/__init__.py[m
+[1m+++ b/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/__init__.py[m
+[36m@@ -3,9 +3,9 @@[m [mfrom .in_aadhaar_recognizer import InAadhaarRecognizer[m
+ from .in_gstin_recognizer import InGstinRecognizer[m
+ from .in_pan_recognizer import InPanRecognizer[m
+ from .in_passport_recognizer import InPassportRecognizer[m
+[32m+[m[32mfrom .in_upi_recognizer import InUpiRecognizer[m
+ from .in_vehicle_registration_recognizer import InVehicleRegistrationRecognizer[m
+ from .in_voter_recognizer import InVoterRecognizer[m
+[31m-from .in_upi_recognizer import InUpiRecognizer[m
+ [m
+ __all__ = [[m
+     "InAadhaarRecognizer",[m
+[36m@@ -15,4 +15,4 @@[m [m__all__ = [[m
+     "InVehicleRegistrationRecognizer",[m
+     "InPassportRecognizer",[m
+     "InUpiRecognizer",[m
+[31m-][m
+\ No newline at end of file[m
+[32m+[m[32m][m
+[1mdiff --git a/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/in_upi_recognizer.py b/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/in_upi_recognizer.py[m
+[1mindex 548d5b1..e6beaff 100644[m
+[1m--- a/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/in_upi_recognizer.py[m
+[1m+++ b/presidio-analyzer/presidio_analyzer/predefined_recognizers/country_specific/india/in_upi_recognizer.py[m
+[36m@@ -1,4 +1,5 @@[m
+ from typing import List, Optional[m
+[32m+[m
+ from presidio_analyzer import Pattern, PatternRecognizer[m
+ [m
+ [m
+[36m@@ -62,4 +63,4 @@[m [mclass InUpiRecognizer(PatternRecognizer):[m
+             patterns=patterns,[m
+             context=context,[m
+             supported_language=supported_language,[m
+[31m-        )[m
+\ No newline at end of file[m
+[32m+[m[32m        )[m

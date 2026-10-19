@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## [unreleased]
+### Analyzer
+#### Added
+
+* Added `InUpiRecognizer` for detecting Indian UPI (Unified Payments Interface) payment IDs (Thanks @shauryaraghav)
 
 ### Analyzer
 #### Added

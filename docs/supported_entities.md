@@ -105,6 +105,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 | IN_VOTER | Indian Election Commission issued 10 digit alpha numeric voter id for all indian citizens (age 18 or above) | Pattern match, context |
 | IN_PASSPORT | Indian Passport Number | Pattern match, Context |
 | IN_GSTIN | The Indian Goods and Services Tax Identification Number (GSTIN) is a 15-character identifier with state code (01-37), PAN, registration number, 'Z', and checksum. | Pattern match, context, and validation |
+| IN_UPI | Indian UPI (Unified Payments Interface) ID used for digital payments, in the format username@handle. | Pattern match, context |
 
 ### Finland
 | FieldType  | Description                                                                                             | Detection Method                         |
