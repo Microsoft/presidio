@@ -29,6 +29,10 @@ def entities():
             ((0, 9), (10, 20), (21, 32), (33, 45), (46, 59),),
             ((0.0, 0.02), (0.0, 0.02), (0.0, 0.02), (0.0, 0.02), (0.0, 0.02),),
         ),
+        # Two-letter prefix + two digits (previously missed due to malformed regex)
+        ("AB12", 1, ((0, 4),), ((0.3, 0.4),),),
+        # Malformed literal that the broken regex used to match
+        ("A-Z]]12", 0, (), (),),
         ("ABCDEFG ABCDEFGH ABCDEFGHI", 0, (), (),),
         ("ABCD ABCDEFGHIJ", 0, (), (),),
         # The following fails due to keyphrases not yet supported
