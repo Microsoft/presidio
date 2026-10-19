@@ -451,3 +451,167 @@ def test_text_chunker_config_rejects_character_params_for_tokenizer():
 
     with pytest.raises(ValidationError, match="chunker_type='tokenizer'"):
         TextChunkerConfig(chunker_type="tokenizer", chunk_size=300)
+
+
+def test_supported_countries_filters_registry_through_provider():
+    """Top-level supported_countries is applied when building the registry.
+
+    Round-trip through RecognizerRegistryProvider: US recognizers are kept,
+    other countries' recognizers are dropped, locale-agnostic ones survive.
+    """
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "supported_countries": ["us"],
+            "recognizers": [
+                {"name": "UsSsnRecognizer"},
+                {"name": "UkNinoRecognizer"},
+                {"name": "CreditCardRecognizer"},
+            ],
+        }
+    )
+    registry = provider.create_recognizer_registry()
+    names = {type(recognizer).__name__ for recognizer in registry.recognizers}
+
+    assert "UsSsnRecognizer" in names
+    assert "UkNinoRecognizer" not in names
+    assert "CreditCardRecognizer" in names
+
+
+def test_supported_countries_omitted_keeps_all_countries():
+    """Omitting supported_countries preserves the previous behavior."""
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {"name": "UsSsnRecognizer"},
+                {"name": "UkNinoRecognizer"},
+            ],
+        }
+    )
+    registry = provider.create_recognizer_registry()
+    names = {type(recognizer).__name__ for recognizer in registry.recognizers}
+
+    assert "UsSsnRecognizer" in names
+    assert "UkNinoRecognizer" in names
+
+
+def test_supported_countries_from_yaml_file(tmp_path):
+    """The documented YAML shape loads and filters through the provider."""
+    import yaml
+
+    conf_path = tmp_path / "registry.yaml"
+    conf_path.write_text(
+        yaml.safe_dump(
+            {
+                "supported_languages": ["en"],
+                "supported_countries": ["us"],
+                "recognizers": [
+                    {"name": "US SSN", "class_name": "UsSsnRecognizer"},
+                    {"name": "UK NINO", "class_name": "UkNinoRecognizer"},
+                ],
+            }
+        )
+    )
+    registry = RecognizerRegistryProvider(
+        conf_file=str(conf_path)
+    ).create_recognizer_registry()
+    names = {type(recognizer).__name__ for recognizer in registry.recognizers}
+
+    assert "UsSsnRecognizer" in names
+    assert "UkNinoRecognizer" not in names
+
+
+def test_supported_countries_rejects_bare_string():
+    """A bare string fails fast with an actionable message."""
+    with pytest.raises(
+        ValueError, match="Invalid recognizer registry configuration"
+    ):
+        RecognizerRegistryProvider(
+            registry_configuration={
+                "supported_languages": ["en"],
+                "supported_countries": "us",
+                "recognizers": [],
+            }
+        )
+
+
+def test_supported_countries_rejects_blank_entry():
+    """Blank country codes fail fast with an actionable message."""
+    with pytest.raises(
+        ValueError, match="Invalid recognizer registry configuration"
+    ):
+        RecognizerRegistryProvider(
+            registry_configuration={
+                "supported_languages": ["en"],
+                "supported_countries": [" "],
+                "recognizers": [],
+            }
+        )
+
+
+def _registry_names_for_countries(countries):
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "supported_countries": countries,
+            "recognizers": [
+                {"name": "UsSsnRecognizer"},
+                {"name": "UkNinoRecognizer"},
+                {"name": "CreditCardRecognizer"},
+            ],
+        }
+    )
+    registry = provider.create_recognizer_registry()
+    return {type(recognizer).__name__ for recognizer in registry.recognizers}
+
+
+def test_supported_countries_uppercase_selects_same_recognizers():
+    """Casing must not change which recognizers are selected.
+
+    ['US'] selects exactly the same recognizers as ['us']: country codes
+    are normalized to lowercase at validation time.
+    """
+    assert _registry_names_for_countries(["US"]) == _registry_names_for_countries(
+        ["us"]
+    )
+    names = _registry_names_for_countries(["US"])
+    assert "UsSsnRecognizer" in names
+    assert "UkNinoRecognizer" not in names
+    assert "CreditCardRecognizer" in names
+
+
+def test_supported_countries_mixed_case_selects_both_countries():
+    """Mixed-case entries like ['Us', 'uK'] keep both countries."""
+    names = _registry_names_for_countries(["Us", "uK"])
+    assert "UsSsnRecognizer" in names
+    assert "UkNinoRecognizer" in names
+    assert "CreditCardRecognizer" in names
+
+
+def test_supported_countries_normalized_in_validated_config():
+    """The validated configuration stores codes lower-cased."""
+    from presidio_analyzer.input_validation import ConfigurationValidator
+
+    dumped = ConfigurationValidator.validate_recognizer_registry_configuration(
+        {
+            "supported_languages": ["en"],
+            "supported_countries": ["US", " Uk "],
+            "recognizers": [{"name": "UsSsnRecognizer"}],
+        }
+    )
+    assert dumped["supported_countries"] == ["us", "uk"]
+
+
+def test_supported_countries_rejects_non_string_entry():
+    """Non-string country codes fail fast with an actionable message."""
+    with pytest.raises(
+        ValueError, match="Invalid recognizer registry configuration"
+    ):
+        RecognizerRegistryProvider(
+            registry_configuration={
+                "supported_languages": ["en"],
+                "supported_countries": [840],
+                "recognizers": [],
+            }
+        )

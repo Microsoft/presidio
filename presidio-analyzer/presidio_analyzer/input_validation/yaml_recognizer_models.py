@@ -464,6 +464,14 @@ class RecognizerRegistryConfig(BaseModel):
     supported_languages: Optional[List[str]] = Field(
         default=None, description="List of supported languages"
     )
+    supported_countries: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "List of ISO 3166-1 alpha-2 country codes used to filter "
+            "country-specific recognizers, e.g. ['us', 'uk'] (case-insensitive). "
+            "Locale-agnostic recognizers are always kept."
+        ),
+    )
     global_regex_flags: int = Field(default=26, description="Global regex flags")
     recognizers: List[
         Union[
@@ -493,6 +501,37 @@ class RecognizerRegistryConfig(BaseModel):
 
         validate_language_codes(languages)
         return languages
+
+    @field_validator("supported_countries")
+    @classmethod
+    def validate_country_codes(
+        cls, countries: Optional[List[str]]
+    ) -> Optional[List[str]]:
+        """Validate and normalize country codes.
+
+        Codes are case-insensitive ISO 3166-1 alpha-2 values; they are
+        stored lower-cased (mirroring ``CustomRecognizerConfig.country_code``)
+        so the validated configuration is canonical regardless of the casing
+        used in the YAML file.
+        """
+
+        # Allow None or empty list; an empty list keeps only
+        # locale-agnostic recognizers (see RecognizerListLoader.get).
+        if countries is None:
+            return None
+
+        if len(countries) == 0:
+            return []
+
+        normalized = []
+        for code in countries:
+            if not isinstance(code, str) or not code.strip():
+                raise ValueError(
+                    "Each entry in 'supported_countries' must be a non-empty "
+                    f"string, e.g. ['us', 'uk']. Got: {code!r}."
+                )
+            normalized.append(code.strip().lower())
+        return normalized
 
     @model_validator(mode="after")
     def validate_languages_for_custom_recognizers(self):
