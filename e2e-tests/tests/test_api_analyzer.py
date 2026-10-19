@@ -218,7 +218,7 @@ def test_given_decision_process_enabled_for_analyze_input_then_return_response_w
         {"entity_type": "US_DRIVER_LICENSE", "start": 22, "end": 30, "score": 0.6499999999999999, 
         "analysis_explanation": {
             "recognizer": "UsLicenseRecognizer", "pattern_name": "Driver License - Alphanumeric (weak)", 
-            "pattern": "\\\\b([A-Z][0-9]{3,6}|[A-Z][0-9]{5,9}|[A-Z][0-9]{6,8}|[A-Z][0-9]{4,8}|[A-Z][0-9]{9,11}|[A-Z]{1,2}[0-9]{5,6}|H[0-9]{8}|V[0-9]{6}|X[0-9]{8}|A-Z]{2}[0-9]{2,5}|[A-Z]{2}[0-9]{3,7}|[0-9]{2}[A-Z]{3}[0-9]{5,6}|[A-Z][0-9]{13,14}|[A-Z][0-9]{18}|[A-Z][0-9]{6}R|[A-Z][0-9]{9}|[A-Z][0-9]{1,12}|[0-9]{9}[A-Z]|[A-Z]{2}[0-9]{6}[A-Z]|[0-9]{8}[A-Z]{2}|[0-9]{3}[A-Z]{2}[0-9]{4}|[A-Z][0-9][A-Z][0-9][A-Z]|[0-9]{7,8}[A-Z])\\\\b", 
+            "pattern": "\\\\b([A-Z][0-9]{1,14}|[A-Z][0-9]{18}|[A-Z]{2}[0-9]{2,7}|[0-9]{2}[A-Z]{3}[0-9]{5,6}|[A-Z][0-9]{6}R|[0-9]{7,9}[A-Z]|[A-Z]{2}[0-9]{6}[A-Z]|[0-9]{8}[A-Z]{2}|[0-9]{3}[A-Z]{2}[0-9]{4}|[A-Z][0-9][A-Z][0-9][A-Z])\\\\b",
             "original_score": 0.3, "score": 0.6499999999999999, "textual_explanation": null, 
             "score_context_improvement": 0.3499999999999999, "supportive_context_word": "license", "validation_result": null
             }
@@ -262,7 +262,7 @@ def test_given_decision_process_enabled_for_analyze_input_with_aditional_context
         {
             "analysis_explanation": {
                 "original_score": 0.3,
-                "pattern": "\\\\b([A-Z][0-9]{3,6}|[A-Z][0-9]{5,9}|[A-Z][0-9]{6,8}|[A-Z][0-9]{4,8}|[A-Z][0-9]{9,11}|[A-Z]{1,2}[0-9]{5,6}|H[0-9]{8}|V[0-9]{6}|X[0-9]{8}|A-Z]{2}[0-9]{2,5}|[A-Z]{2}[0-9]{3,7}|[0-9]{2}[A-Z]{3}[0-9]{5,6}|[A-Z][0-9]{13,14}|[A-Z][0-9]{18}|[A-Z][0-9]{6}R|[A-Z][0-9]{9}|[A-Z][0-9]{1,12}|[0-9]{9}[A-Z]|[A-Z]{2}[0-9]{6}[A-Z]|[0-9]{8}[A-Z]{2}|[0-9]{3}[A-Z]{2}[0-9]{4}|[A-Z][0-9][A-Z][0-9][A-Z]|[0-9]{7,8}[A-Z])\\\\b",
+                "pattern": "\\\\b([A-Z][0-9]{1,14}|[A-Z][0-9]{18}|[A-Z]{2}[0-9]{2,7}|[0-9]{2}[A-Z]{3}[0-9]{5,6}|[A-Z][0-9]{6}R|[0-9]{7,9}[A-Z]|[A-Z]{2}[0-9]{6}[A-Z]|[0-9]{8}[A-Z]{2}|[0-9]{3}[A-Z]{2}[0-9]{4}|[A-Z][0-9][A-Z][0-9][A-Z])\\\\b",
                 "pattern_name": "Driver License - Alphanumeric (weak)",
                 "recognizer": "UsLicenseRecognizer",
                 "score": 0.6499999999999999,
