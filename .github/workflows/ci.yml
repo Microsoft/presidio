@@ -315,6 +315,7 @@ jobs:
           TAG: ':${{ env.TAG }}'
 
       - name: Set up Python
+        id: setup-python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.10'
@@ -325,9 +326,9 @@ jobs:
           path: |
             ~/.cache/pip
             e2e-tests/env
-          key: ${{ runner.os }}-${{ matrix.platform }}-e2e-${{ hashFiles('e2e-tests/requirements.txt') }}
+          key: ${{ runner.os }}-${{ matrix.platform }}-e2e-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('e2e-tests/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.platform }}-e2e-
+            ${{ runner.os }}-${{ matrix.platform }}-e2e-py${{ steps.setup-python.outputs.python-version }}-
 
       - name: Install E2E test dependencies
         working-directory: e2e-tests
@@ -408,6 +409,7 @@ jobs:
           TAG: ':${{ env.TAG }}'
 
       - name: Set up Python
+        id: setup-python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.10'
@@ -418,9 +420,9 @@ jobs:
           path: |
             ~/.cache/pip
             e2e-tests/env
-          key: ${{ runner.os }}-${{ matrix.platform }}-local-e2e-${{ hashFiles('e2e-tests/requirements.txt') }}
+          key: ${{ runner.os }}-${{ matrix.platform }}-local-e2e-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('e2e-tests/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.platform }}-local-e2e-
+            ${{ runner.os }}-${{ matrix.platform }}-local-e2e-py${{ steps.setup-python.outputs.python-version }}-
 
       - name: Install E2E test dependencies
         working-directory: e2e-tests
