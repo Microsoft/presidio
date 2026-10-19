@@ -49,6 +49,10 @@ class KrRrnRecognizer(PatternRecognizer):
         "RRN",
         "rrn",
         "rrn#",
+        "주민등록번호",
+        "주민번호",
+        "신분증",
+        "본인인증",
     ]
 
     def __init__(
