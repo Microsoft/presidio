@@ -2,9 +2,15 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Union
 
-from pandas import DataFrame
+from pandas import DataFrame, isna
+from pandas.api.types import is_scalar
 from presidio_anonymizer.entities import OperatorConfig
-from presidio_anonymizer.operators import OperatorsFactory, OperatorType
+from presidio_anonymizer.operators import (
+    Custom,
+    Keep,
+    OperatorsFactory,
+    OperatorType,
+)
 
 from presidio_structured.config import StructuredAnalysis
 
@@ -52,7 +58,15 @@ class DataProcessorBase(ABC):
 
     @staticmethod
     def _create_operator_callable(operator, params):
+        # The analyzer analyzes int and float values as str(value), and
+        # operators such as mask, hash and encrypt only work on text, so they
+        # get the same string. keep and custom lambdas still receive the value
+        # unchanged.
+        convert_numbers = not isinstance(operator, (Custom, Keep))
+
         def operator_callable(text):
+            if convert_numbers and isinstance(text, (int, float)):
+                text = str(text)
             return operator.operate(params=params, text=text)
 
         return operator_callable
@@ -120,12 +134,21 @@ class PandasDataProcessor(DataProcessorBase):
 
         for key, operator_callable in key_to_operator_mapping.items():
             self.logger.debug(f"Operating on column {key}")
-            for index, text_to_operate_on in data[key].items():
-                operated_text = self._operate_on_text(
-                    text_to_operate_on, operator_callable
-                )
-                data.at[index, key] = operated_text
+            # Assign the whole column at once: writing cell by cell with .at
+            # fails when the operated text does not fit the column dtype
+            # (e.g. int64), and writes to every row sharing a duplicated index
+            # label. Missing values hold no PII and are left as they are.
+            data[key] = [
+                value
+                if self._is_missing(value)
+                else self._operate_on_text(value, operator_callable)
+                for value in data[key]
+            ]
         return data
+
+    @staticmethod
+    def _is_missing(value: Any) -> bool:
+        return is_scalar(value) and bool(isna(value))
 
 
 class JsonDataProcessor(DataProcessorBase):
