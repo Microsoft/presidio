@@ -22,8 +22,12 @@ def entities():
         ("1234567893", 1, ((0, 10),), (("max", "max"),),),
         # Another valid NPI
         ("1245319599", 1, ((0, 10),), (("max", "max"),),),
-        # Valid NPI starting with 2 (Type 2 = organization)
+        # Valid NPI (Type 1 = individual)
         ("1003000126", 1, ((0, 10),), (("max", "max"),),),
+        # Valid NPI starting with 2 (Type 2 = organization)
+        ("2123456784", 1, ((0, 10),), (("max", "max"),),),
+        # Invalid: starts with 2 (Type 2) but fails Luhn check → filtered out
+        ("2123456783", 0, (), (),),
         # Formatted NPI with dashes — Luhn validates after stripping → MAX
         ("1234-567-893", 1, ((0, 12),), (("max", "max"),),),
         # Formatted NPI with spaces — Luhn validates after stripping → MAX
