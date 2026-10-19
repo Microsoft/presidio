@@ -10,13 +10,10 @@ logger = logging.getLogger("presidio-analyzer")
 
 class TransformersRecognizer(SpacyRecognizer):
     """
-    Recognize entities using the spacy-huggingface-pipeline package.
+    Recognize entities produced by the Transformers NLP engine.
 
-    The recognizer doesn't run transformers models,
-    but loads the output from the NlpArtifacts
-    See:
-     - https://huggingface.co/docs/transformers/main/en/index for transformer models
-     - https://github.com/explosion/spacy-huggingface-pipelines on the spaCy wrapper to transformers
+    The recognizer does not run Transformers models directly. It reads the
+    entities and confidence scores exposed through NlpArtifacts.
     """  # noqa: E501
 
     ENTITIES = [

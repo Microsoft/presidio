@@ -4,16 +4,13 @@ from typing import Dict, List, Optional
 import spacy
 from spacy.tokens import Doc, Span
 
-try:
-    import spacy_huggingface_pipelines
-    import transformers
-except ImportError:
-    spacy_huggingface_pipelines = None
-    transformers = None
-
 from presidio_analyzer.nlp_engine import (
     NerModelConfiguration,
     SpacyNlpEngine,
+)
+from presidio_analyzer.nlp_engine.huggingface_token_pipe import (
+    FACTORY_NAME,
+    is_available,
 )
 
 logger = logging.getLogger("presidio-analyzer")
@@ -50,7 +47,7 @@ class TransformersNlpEngine(SpacyNlpEngine):
     """
 
     engine_name = "transformers"
-    is_available = bool(spacy_huggingface_pipelines)
+    is_available = is_available()
 
     def __init__(
         self,
@@ -89,14 +86,13 @@ class TransformersNlpEngine(SpacyNlpEngine):
 
             pipe_config = {
                 "model": transformers_model,
-                "annotate": "spans",
                 "stride": self.ner_model_configuration.stride,
                 "alignment_mode": self.ner_model_configuration.alignment_mode,
                 "aggregation_strategy": self.ner_model_configuration.aggregation_strategy,  # noqa: E501
-                "annotate_spans_key": self.entity_key,
+                "spans_key": self.entity_key,
             }
 
-            nlp.add_pipe("hf_token_pipe", config=pipe_config)
+            nlp.add_pipe(FACTORY_NAME, config=pipe_config)
             self.nlp[model["lang_code"]] = nlp
 
     @staticmethod
@@ -118,7 +114,7 @@ class TransformersNlpEngine(SpacyNlpEngine):
         """
         Extract entities out of a spaCy pipeline, depending on the type of pipeline.
 
-        For spacy-huggingface-pipeline, this would be doc.spans[key]
+        For the Hugging Face token pipe, this is doc.spans[key].
         :param doc: the output spaCy doc.
         :return: List of entities
         """
@@ -129,7 +125,7 @@ class TransformersNlpEngine(SpacyNlpEngine):
         """Extract scores for entities from the doc.
 
         While spaCy does not provide confidence scores,
-        the spacy-huggingface-pipeline flow adds confidence scores
+        the Hugging Face token pipe adds confidence scores
         as SpanGroup attributes.
         :param doc: SpaCy doc
         """

@@ -215,7 +215,9 @@ The `ner_model_configuration` section contains the following parameters:
     For example, for `bert-base-NER-uncased`, it can be found here: <https://huggingface.co/dslim/bert-base-NER-uncased/blob/main/config.json>.
     Note that most NER models add a prefix to the class (e.g. `B-PER` for class `PER`). When creating the mapping, do not add the prefix.
 
-See more information on parameters on the [spacy-huggingface-pipelines Github repo](https://github.com/explosion/spacy-huggingface-pipelines#token-classification).
+See the Hugging Face
+[token-classification pipeline documentation](https://huggingface.co/docs/transformers/main_classes/pipelines#transformers.TokenClassificationPipeline)
+for more information on aggregation and stride behavior.
   
 Once created, see [the NLP configuration documentation](../customizing_nlp_models.md#Configure-Presidio-to-use-the-new-model) for more information.
 
