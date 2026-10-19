@@ -82,6 +82,12 @@ class DicomImagePiiVerifyEngine(ImagePiiVerifyEngine, DicomImageRedactorEngine):
 
         is_greyscale = self._check_if_greyscale(instance_copy)
         image = self._rescale_dcm_pixel_array(instance, is_greyscale)
+        num_frames = self._get_number_of_frames(instance)
+        if num_frames > 1 and image.shape[0] == num_frames:
+            # Verification visualizes a single representative frame; redaction
+            # (DicomImageRedactorEngine) handles every frame of a multi-frame
+            # instance.
+            image = image[0]
         if is_greyscale:
             # model L for grayscale, and has 8 bit-pixel to store the pixel value
             image_pil = Image.fromarray(image, mode="L")

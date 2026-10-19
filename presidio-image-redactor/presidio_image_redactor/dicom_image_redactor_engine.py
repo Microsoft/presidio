@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import shutil
@@ -70,31 +71,61 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
 
         is_greyscale = self._check_if_greyscale(instance)
         image_np = self._rescale_dcm_pixel_array(instance, is_greyscale)
-        if is_greyscale:
-            # model L for grayscale, and has 8 bit-pixel to store the pixel value
-            image_pil = Image.fromarray(image_np, mode="L")
-        else:
-            # model RGB, has 3x8 bit pixel available to store the value
-            image_pil = Image.fromarray(image_np, mode="RGB")
-        padded_image_pil = self._add_padding(image_pil, is_greyscale, padding_width)
+        num_frames = self._get_number_of_frames(instance)
+        is_multiframe = num_frames > 1 and image_np.shape[0] == num_frames
 
+        # Detect PII on each frame independently. Multi-frame DICOMs can carry
+        # burned-in PHI on any frame, and not necessarily in the same location.
+        frames = image_np if is_multiframe else [image_np]
+        bboxes_per_frame = []
+        analyzed_frames: Dict[bytes, List[Dict[str, int]]] = {}
+        for frame_np in frames:
+            # Identical frames (e.g. static lead-in or padding frames in cine
+            # loops) yield identical detection results; skip re-running
+            # OCR + analysis for frames already seen.
+            frame_key = (
+                hashlib.sha256(frame_np.tobytes()).digest() if is_multiframe else None
+            )
+            if frame_key is not None and frame_key in analyzed_frames:
+                bboxes_per_frame.append(analyzed_frames[frame_key])
+                continue
 
-        # Detect PII
-        analyzer_results = self._get_analyzer_results(
-            padded_image_pil,
-            instance,
-            use_metadata,
-            ocr_kwargs,
-            ad_hoc_recognizers,
-            **text_analyzer_kwargs,
+            image_pil = self._image_from_array(frame_np, is_greyscale)
+            padded_image_pil = self._add_padding(image_pil, is_greyscale, padding_width)
+
+            # Detect PII
+            analyzer_results = self._get_analyzer_results(
+                padded_image_pil,
+                instance,
+                use_metadata,
+                ocr_kwargs,
+                ad_hoc_recognizers,
+                **text_analyzer_kwargs,
+            )
+
+            analyzer_bboxes = self.bbox_processor.get_bboxes_from_analyzer_results(
+                analyzer_results
+            )
+            frame_bboxes = self.bbox_processor.remove_bbox_padding(
+                analyzer_bboxes, padding_width
+            )
+            if frame_key is not None:
+                analyzed_frames[frame_key] = frame_bboxes
+            bboxes_per_frame.append(frame_bboxes)
+
+        # Redact all bounding boxes from DICOM file (every frame for multi-frame)
+        boxes_for_redaction = bboxes_per_frame if is_multiframe else bboxes_per_frame[0]
+        redacted_image = self._add_redact_box(
+            instance, boxes_for_redaction, crop_ratio, fill
         )
 
-        # Redact all bounding boxes from DICOM file
-        analyzer_bboxes = self.bbox_processor.get_bboxes_from_analyzer_results(
-            analyzer_results
-        )
-        bboxes = self.bbox_processor.remove_bbox_padding(analyzer_bboxes, padding_width)
-        redacted_image = self._add_redact_box(instance, bboxes, crop_ratio, fill)
+        # Aggregate bboxes across frames for the return value
+        bboxes = [
+            bbox
+            for frame_bboxes in bboxes_per_frame
+            if frame_bboxes
+            for bbox in frame_bboxes
+        ]
 
         return redacted_image, bboxes
 
@@ -313,6 +344,38 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
         return is_greyscale
 
     @staticmethod
+    def _get_number_of_frames(instance: pydicom.dataset.FileDataset) -> int:
+        """Return the number of frames in a DICOM instance.
+
+        Reads the Number of Frames element (0028,0008). Defaults to 1 when the
+        element is absent or cannot be parsed (i.e., a single-frame instance).
+
+        :param instance: A single DICOM instance.
+
+        :return: Number of frames (>= 1).
+        """
+        try:
+            number_of_frames = instance[0x0028, 0x0008].value
+            if number_of_frames is None:
+                return 1
+            return int(number_of_frames)
+        except (KeyError, ValueError, TypeError):
+            return 1
+
+    @staticmethod
+    def _image_from_array(image_np: np.ndarray, is_greyscale: bool) -> Image.Image:
+        """Convert a single-frame pixel array into a PIL image.
+
+        :param image_np: Pixel data for a single frame (rescaled to uint8).
+        :param is_greyscale: FALSE if the Photometric Interpretation is RGB.
+
+        :return: PIL image (mode "L" for greyscale, "RGB" otherwise).
+        """
+        # mode "L" for grayscale (8 bit-pixel), "RGB" for 3x8 bit pixel values
+        mode = "L" if is_greyscale else "RGB"
+        return Image.fromarray(image_np, mode=mode)
+
+    @staticmethod
     def _rescale_dcm_pixel_array(
         instance: pydicom.dataset.FileDataset, is_greyscale: bool
     ) -> np.ndarray:
@@ -321,17 +384,37 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
         :param instance: A singe DICOM instance.
         :param is_greyscale: FALSE if the Photometric Interpretation is RGB.
 
-        :return: Rescaled DICOM pixel_array.
+        :return: Rescaled DICOM pixel_array (2D for single-frame; stacked with a
+        leading frame dimension for multi-frame instances).
         """
-        # Normalize contrast
-        if "WindowWidth" in instance:
-            if is_greyscale:
-                image_2d = apply_voi_lut(instance.pixel_array, instance)
-            else:
-                image_2d = instance.pixel_array
+        # Normalize contrast. apply_voi_lut is applied element-wise and is safe
+        # for multi-frame stacks.
+        if "WindowWidth" in instance and is_greyscale:
+            pixel_array = apply_voi_lut(instance.pixel_array, instance)
         else:
-            image_2d = instance.pixel_array
+            pixel_array = instance.pixel_array
 
+        # Rescale each frame independently so that per-frame contrast is
+        # preserved for multi-frame instances.
+        num_frames = DicomImageRedactorEngine._get_number_of_frames(instance)
+        if num_frames > 1 and pixel_array.shape[0] == num_frames:
+            scaled_frames = [
+                DicomImageRedactorEngine._rescale_array(pixel_array[i], is_greyscale)
+                for i in range(num_frames)
+            ]
+            return np.stack(scaled_frames, axis=0)
+
+        return DicomImageRedactorEngine._rescale_array(pixel_array, is_greyscale)
+
+    @staticmethod
+    def _rescale_array(image_2d: np.ndarray, is_greyscale: bool) -> np.ndarray:
+        """Rescale a single-frame pixel array to uint8.
+
+        :param image_2d: Pixel data for a single frame.
+        :param is_greyscale: FALSE if the Photometric Interpretation is RGB.
+
+        :return: Rescaled uint8 array.
+        """
         # Convert to float to avoid overflow or underflow losses.
         image_2d_float = image_2d.astype(float)
 
@@ -339,10 +422,14 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
             image_2d_scaled = image_2d_float
         else:
             # Rescaling grey scale between 0-255
-            image_2d_scaled = (
-                (image_2d_float.max() - image_2d_float)
-                / (image_2d_float.max() - image_2d_float.min())
-            ) * 255.0
+            pixel_range = image_2d_float.max() - image_2d_float.min()
+            if pixel_range == 0:
+                # Flat frame; avoid division by zero.
+                image_2d_scaled = np.zeros_like(image_2d_float)
+            else:
+                image_2d_scaled = (
+                    (image_2d_float.max() - image_2d_float) / pixel_range
+                ) * 255.0
 
         # Convert to uint
         image_2d_scaled = np.uint8(image_2d_scaled)
@@ -430,6 +517,7 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
         instance: pydicom.dataset.FileDataset,
         crop_ratio: float,
         fill: str = "contrast",
+        pixel_array: Optional[np.ndarray] = None,
     ) -> Union[int, Tuple[int, int, int]]:
         """Find the most common pixel value.
 
@@ -439,11 +527,14 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
         :param fill: Determines how box color is selected.
         'contrast' - Masks stand out relative to background.
         'background' - Masks are same color as background.
+        :param pixel_array: Optional single-frame pixel array to use instead of
+        ``instance.pixel_array`` (used for multi-frame instances).
 
         :return: Most or least common pixel value (depending on fill).
         """
         # Crop down to just only look at image corners
-        cropped_array = cls._get_array_corners(instance.pixel_array, crop_ratio)
+        source_array = instance.pixel_array if pixel_array is None else pixel_array
+        cropped_array = cls._get_array_corners(source_array, crop_ratio)
 
         # Get flattened pixel array
         flat_pixel_array = np.array(cropped_array).flatten()
@@ -661,9 +752,7 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
                 value = text_metadata[i]
                 # Flatten MultiValue/list/tuple into individual elements
                 items = (
-                    value
-                    if isinstance(value, (MultiValue, list, tuple))
-                    else [value]
+                    value if isinstance(value, (MultiValue, list, tuple)) else [value]
                 )
                 for item in items:
                     text = str(item).strip()
@@ -741,7 +830,10 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
 
     @classmethod
     def _set_bbox_color(
-        cls, instance: pydicom.dataset.FileDataset, fill: str
+        cls,
+        instance: pydicom.dataset.FileDataset,
+        fill: str,
+        pixel_array: Optional[np.ndarray] = None,
     ) -> Union[int, Tuple[int, int, int]]:
         """Set the bounding box color.
 
@@ -749,6 +841,8 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
         :param fill: Determines how box color is selected.
         'contrast' - Masks stand out relative to background.
         'background' - Masks are same color as background.
+        :param pixel_array: Optional single-frame pixel array to use instead of
+        ``instance.pixel_array`` (used for multi-frame instances).
 
         :return: int or tuple of int values determining masking box color.
         """
@@ -761,12 +855,13 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
             raise ValueError("fill must be 'contrast' or 'background'")
 
         is_greyscale = cls._check_if_greyscale(instance)
+        source_array = instance.pixel_array if pixel_array is None else pixel_array
         if is_greyscale:
             # model L for grayscale, and has 8 bit-pixel to store the pixel value
-            image_pil = Image.fromarray(instance.pixel_array, mode="L")
+            image_pil = Image.fromarray(source_array, mode="L")
         else:
             # model RGB, has 3x8 bit pixel available to store the value
-            image_pil = Image.fromarray(instance.pixel_array, mode="RGB")
+            image_pil = Image.fromarray(source_array, mode="RGB")
         box_color = cls._get_bg_color(image_pil, is_greyscale, invert_flag)
 
         return box_color
@@ -839,6 +934,44 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
 
         return has_image_icon_sequence
 
+    @staticmethod
+    def _normalize_bboxes_per_frame(
+        bounding_boxes_coordinates: list, num_frames: int, is_multiframe: bool
+    ) -> List[list]:
+        """Normalize bbox input into one list of bboxes per frame.
+
+        Accepts either a flat list of bbox dicts (single-frame, or the same
+        boxes to apply to every frame of a multi-frame instance) or a list of
+        per-frame bbox lists.
+
+        :param bounding_boxes_coordinates: Flat bbox list or per-frame bbox lists.
+        :param num_frames: Number of frames in the instance.
+        :param is_multiframe: Whether the instance has more than one frame.
+
+        :return: List with one bbox list per frame.
+        """
+        if not is_multiframe:
+            # Accept the per-frame format ([[...]]) for a single-frame instance
+            # by collapsing it to that one frame's bbox list.
+            if bounding_boxes_coordinates and isinstance(
+                bounding_boxes_coordinates[0], list
+            ):
+                return [bounding_boxes_coordinates[0]]
+            return [bounding_boxes_coordinates or []]
+
+        if bounding_boxes_coordinates and isinstance(
+            bounding_boxes_coordinates[0], dict
+        ):
+            # A flat list was provided for a multi-frame instance: apply the
+            # same boxes to every frame.
+            return [list(bounding_boxes_coordinates) for _ in range(num_frames)]
+
+        # Already per-frame; pad/truncate to exactly num_frames entries.
+        per_frame = [list(frame or []) for frame in bounding_boxes_coordinates]
+        if len(per_frame) < num_frames:
+            per_frame += [[] for _ in range(num_frames - len(per_frame))]
+        return per_frame[:num_frames]
+
     @classmethod
     def _add_redact_box(
         cls,
@@ -848,6 +981,11 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
         fill: str = "contrast",
     ) -> pydicom.dataset.FileDataset:
         """Add redaction bounding boxes on a DICOM instance.
+
+        For multi-frame instances the redaction is applied to every frame.
+        ``bounding_boxes_coordinates`` may be a flat list of bbox dicts (applied
+        to the single frame, or to all frames of a multi-frame instance) or a
+        list of per-frame bbox lists.
 
         :param instance: A single DICOM instance.
         :param bounding_boxes_coordinates: Bounding box coordinates.
@@ -865,26 +1003,47 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
         has_image_icon_sequence = cls._check_if_has_image_icon_sequence(
             redacted_instance
         )
-
-        # Select masking box color
         is_greyscale = cls._check_if_greyscale(instance)
-        if is_greyscale:
-            box_color = cls._get_most_common_pixel_value(instance, crop_ratio, fill)
-        else:
-            box_color = cls._set_bbox_color(redacted_instance, fill)
 
-        # Apply mask
-        for i in range(0, len(bounding_boxes_coordinates)):
-            bbox = bounding_boxes_coordinates[i]
-            top = bbox["top"]
-            left = bbox["left"]
-            width = bbox["width"]
-            height = bbox["height"]
-            redacted_instance.pixel_array[top : top + height, left : left + width] = (
-                box_color
-            )
+        # Decode the pixel data once and mutate it in place; writing it back as a
+        # single block keeps multi-frame data consistent (each access to
+        # ``pixel_array`` otherwise re-decodes from ``PixelData``).
+        pixel_array = redacted_instance.pixel_array
+        num_frames = cls._get_number_of_frames(instance)
+        is_multiframe = num_frames > 1 and pixel_array.shape[0] == num_frames
 
-        redacted_instance.PixelData = redacted_instance.pixel_array.tobytes()
+        bboxes_per_frame = cls._normalize_bboxes_per_frame(
+            bounding_boxes_coordinates, num_frames, is_multiframe
+        )
+
+        for frame_idx, frame_bboxes in enumerate(bboxes_per_frame):
+            if not frame_bboxes:
+                # No PHI detected on this frame; nothing to mask.
+                continue
+
+            frame_view = pixel_array[frame_idx] if is_multiframe else pixel_array
+
+            # Select masking box color per frame so contrast is preserved. Reuse
+            # the already-decoded frame_view to avoid decoding the pixel data
+            # again.
+            if is_greyscale:
+                box_color = cls._get_most_common_pixel_value(
+                    redacted_instance, crop_ratio, fill, pixel_array=frame_view
+                )
+            else:
+                box_color = cls._set_bbox_color(
+                    redacted_instance, fill, pixel_array=frame_view
+                )
+
+            # Apply mask
+            for bbox in frame_bboxes:
+                top = bbox["top"]
+                left = bbox["left"]
+                width = bbox["width"]
+                height = bbox["height"]
+                frame_view[top : top + height, left : left + width] = box_color
+
+        redacted_instance.PixelData = pixel_array.tobytes()
 
         # If original pixel data is compressed, recompress after redaction
         if is_compressed or has_image_icon_sequence:
@@ -1021,33 +1180,61 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
             raise AttributeError("Provided DICOM file lacks pixel data.")
 
         is_greyscale = self._check_if_greyscale(instance)
-        image = self._rescale_dcm_pixel_array(instance, is_greyscale)
-        if is_greyscale:
-            # model L for grayscale, and has 8 bit-pixel to store the pixel value
-            loaded_image = Image.fromarray(image, mode="L")
-        else:
-            loaded_image = Image.fromarray(image, mode="RGB")
-        image = self._add_padding(loaded_image, is_greyscale, padding_width)
+        image_np = self._rescale_dcm_pixel_array(instance, is_greyscale)
+        num_frames = self._get_number_of_frames(instance)
+        is_multiframe = num_frames > 1 and image_np.shape[0] == num_frames
 
-        # Detect PII
-        analyzer_results = self._get_analyzer_results(
-            image,
-            instance,
-            use_metadata,
-            ocr_kwargs,
-            ad_hoc_recognizers,
-            **text_analyzer_kwargs,
-        )
+        # Detect PII on each frame independently
+        frames = image_np if is_multiframe else [image_np]
+        bboxes_per_frame = []
+        analyzed_frames: Dict[bytes, List[Dict[str, int]]] = {}
+        for frame_np in frames:
+            # Skip re-running OCR + analysis for identical frames (see
+            # redact_and_return_bbox).
+            frame_key = (
+                hashlib.sha256(frame_np.tobytes()).digest() if is_multiframe else None
+            )
+            if frame_key is not None and frame_key in analyzed_frames:
+                bboxes_per_frame.append(analyzed_frames[frame_key])
+                continue
 
-        # Redact all bounding boxes from DICOM file
-        analyzer_bboxes = self.bbox_processor.get_bboxes_from_analyzer_results(
-            analyzer_results
-        )
-        bboxes = self.bbox_processor.remove_bbox_padding(analyzer_bboxes, padding_width)
+            loaded_image = self._image_from_array(frame_np, is_greyscale)
+            padded_image = self._add_padding(loaded_image, is_greyscale, padding_width)
+
+            # Detect PII
+            analyzer_results = self._get_analyzer_results(
+                padded_image,
+                instance,
+                use_metadata,
+                ocr_kwargs,
+                ad_hoc_recognizers,
+                **text_analyzer_kwargs,
+            )
+
+            analyzer_bboxes = self.bbox_processor.get_bboxes_from_analyzer_results(
+                analyzer_results
+            )
+            frame_bboxes = self.bbox_processor.remove_bbox_padding(
+                analyzer_bboxes, padding_width
+            )
+            if frame_key is not None:
+                analyzed_frames[frame_key] = frame_bboxes
+            bboxes_per_frame.append(frame_bboxes)
+
+        # Redact all bounding boxes from DICOM file (every frame for multi-frame)
+        boxes_for_redaction = bboxes_per_frame if is_multiframe else bboxes_per_frame[0]
         redacted_dicom_instance = self._add_redact_box(
-            instance, bboxes, crop_ratio, fill
+            instance, boxes_for_redaction, crop_ratio, fill
         )
         redacted_dicom_instance.save_as(dst_path)
+
+        # Aggregate bboxes across frames for saving
+        bboxes = [
+            bbox
+            for frame_bboxes in bboxes_per_frame
+            if frame_bboxes
+            for bbox in frame_bboxes
+        ]
 
         # Save redacted bboxes
         if save_bboxes:
