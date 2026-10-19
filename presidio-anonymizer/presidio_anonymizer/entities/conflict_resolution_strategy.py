@@ -15,7 +15,6 @@ class ConflictResolutionStrategy(Enum):
     the lower-scored one is trimmed to the part outside the higher-scored one
     (on equal scores, the one that starts first keeps the overlap). Results
     trimmed to nothing are dropped.
-    NONE: No conflict resolution will be performed.
     """
 
     MERGE_SIMILAR_OR_CONTAINED = "merge_similar_or_contained"
