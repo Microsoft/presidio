@@ -86,16 +86,18 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         # create recognizer context dictionary
         recognizers_dict = {recognizer.id: recognizer for recognizer in recognizers}
 
-        # Create empty list in None or lowercase all context words in the list
-        if not context:
-            context = []
-        else:
-            context = [word.lower() for word in context]
-
         # Sanity
         if nlp_artifacts is None:
             logger.warning("NLP artifacts were not provided")
             return results
+
+        # Ensure a context list always exists. Case folding of these words is
+        # deferred to _find_supportive_word_in_context, which folds both sides
+        # of the comparison with the matched recognizer's language (locale-aware
+        # for tr/az). Folding here would lose the original casing needed for
+        # that locale-aware fold.
+        if not context:
+            context = []
 
         for result in results:
             recognizer = None
@@ -138,14 +140,20 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
             word = text[result.start : result.end]
 
             surrounding_words = self._extract_surrounding_words(
-                nlp_artifacts=nlp_artifacts, word=word, start=result.start
+                nlp_artifacts=nlp_artifacts,
+                word=word,
+                start=result.start,
+                language=recognizer.supported_language,
             )
 
             # combine other sources of context with surrounding words
             surrounding_words.extend(context)
 
             supportive_context_word = self._find_supportive_word_in_context(
-                surrounding_words, recognizer.context, self.context_matching_mode
+                surrounding_words,
+                recognizer.context,
+                self.context_matching_mode,
+                recognizer.supported_language,
             )
             if supportive_context_word != "":
                 result.score += self.context_similarity_factor
@@ -161,10 +169,33 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         return results
 
     @staticmethod
+    def _fold(text: str, language: Optional[str] = None) -> str:
+        """Case-fold text using locale-aware rules for the dotted/dotless I.
+
+        Python's ``str.lower`` is locale-independent and mangles Turkish and
+        Azerbaijani casing: ``"İ"`` (U+0130) lowers to ``"i̇"`` (``i`` plus a
+        combining dot) and ``"I"`` (U+0049) lowers to ``"i"`` instead of
+        ``"ı"`` (U+0131). Uppercase context words such as ``"TC KİMLİK NO"``
+        therefore stop containing ``"kimlik"`` after lowering, so the context
+        boost silently fails for the ``tr``/``az`` recognizers.
+
+        For ``tr``/``az`` the dotted/dotless pairs are pre-mapped before
+        lowering. For every other language (and when ``language`` is ``None``)
+        the result is byte-identical to ``text.lower()``.
+
+        :param text: the text to case-fold
+        :param language: the language the surrounding recognizer supports
+        """
+        if language in ("tr", "az"):
+            text = text.replace("İ", "i").replace("I", "ı")
+        return text.lower()
+
+    @staticmethod
     def _find_supportive_word_in_context(
         context_list: List[str],
         recognizer_context_list: List[str],
         matching_mode: str = "substring",
+        language: Optional[str] = None,
     ) -> str:
         """
         Find words in the text which are relevant for context evaluation.
@@ -181,6 +212,8 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                 context keywords manually specified by the recognizer's author
         :param matching_mode: Matching mode ('whole_word' or 'substring').
                Defaults to 'substring'.
+        :param language: language of the recognizer, used for locale-aware
+               case folding (e.g. the Turkish dotted/dotless I).
         """
         word = ""
         # If the context list is empty, no need to continue
@@ -197,7 +230,10 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                     (
                         True
                         for keyword in context_list
-                        if predefined_context_word.lower() in keyword.lower()
+                        if LemmaContextAwareEnhancer._fold(
+                            predefined_context_word, language
+                        )
+                        in LemmaContextAwareEnhancer._fold(keyword, language)
                     ),
                     False,
                 )
@@ -207,7 +243,10 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                     (
                         True
                         for keyword in context_list
-                        if predefined_context_word.lower() == keyword.lower()
+                        if LemmaContextAwareEnhancer._fold(
+                            predefined_context_word, language
+                        )
+                        == LemmaContextAwareEnhancer._fold(keyword, language)
                     ),
                     False,
                 )
@@ -220,7 +259,11 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         return word
 
     def _extract_surrounding_words(
-        self, nlp_artifacts: NlpArtifacts, word: str, start: int
+        self,
+        nlp_artifacts: NlpArtifacts,
+        word: str,
+        start: int,
+        language: Optional[str] = None,
     ) -> List[str]:
         """Extract words surrounding another given word.
 
@@ -232,6 +275,8 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                               execution on a given text
         :param word: The word to look for context around
         :param start: The start index of the word in the original text
+        :param language: language of the recognizer, used for locale-aware
+                         case folding of the surrounding words
         """
         if not nlp_artifacts.tokens:
             logger.info("Skipping context extraction due to lack of NLP artifacts")
@@ -259,12 +304,14 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
             self.context_prefix_count,
             nlp_artifacts.lemmas,
             lemmatized_keywords,
+            language,
         )
         forward_context = self._add_n_words_forward(
             token_index,
             self.context_suffix_count,
             nlp_artifacts.lemmas,
             lemmatized_keywords,
+            language,
         )
 
         context_list = []
@@ -315,6 +362,7 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         lemmas: List[str],
         lemmatized_filtered_keywords: List[str],
         is_backward: bool,
+        language: Optional[str] = None,
     ) -> List[str]:
         """
         Prepare a string of context words.
@@ -329,6 +377,8 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                lemmas from the original sentence,
         :param is_backward: if true take the preceeding words, if false,
                             take the successing words
+        :param language: language of the recognizer, used for locale-aware
+               case folding of the collected words
         """
         i = index
         context_words = []
@@ -340,9 +390,16 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         # collect at most n words (in lower case)
         remaining = n_words + 1
         while 0 <= i < len(lemmas) and remaining > 0:
+            # Membership is tested against the plain-lowercased keywords built
+            # by NlpArtifacts, but the collected word is case-folded so that
+            # locale-sensitive lemmas (e.g. Turkish "KAYIT") match the
+            # recognizer context words. For non-tr/az languages _fold is
+            # identical to str.lower, so this is byte-for-byte unchanged.
             lower_lemma = lemmas[i].lower()
             if lower_lemma in lemmatized_filtered_keywords:
-                context_words.append(lower_lemma)
+                context_words.append(
+                    LemmaContextAwareEnhancer._fold(lemmas[i], language)
+                )
                 remaining -= 1
             i = i - 1 if is_backward else i + 1
         return context_words
@@ -353,9 +410,10 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         n_words: int,
         lemmas: List[str],
         lemmatized_filtered_keywords: List[str],
+        language: Optional[str] = None,
     ) -> List[str]:
         return self._add_n_words(
-            index, n_words, lemmas, lemmatized_filtered_keywords, False
+            index, n_words, lemmas, lemmatized_filtered_keywords, False, language
         )
 
     def _add_n_words_backward(
@@ -364,7 +422,8 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         n_words: int,
         lemmas: List[str],
         lemmatized_filtered_keywords: List[str],
+        language: Optional[str] = None,
     ) -> List[str]:
         return self._add_n_words(
-            index, n_words, lemmas, lemmatized_filtered_keywords, True
+            index, n_words, lemmas, lemmatized_filtered_keywords, True, language
         )

@@ -81,6 +81,45 @@ def test_when_context_word_case_insensitive_then_succeed():
     assert result == "LIC"
 
 
+def test_when_whole_word_turkish_context_then_locale_aware_match():
+    """
+    Test that whole_word matching folds the Turkish dotted/dotless I.
+
+    An uppercase Turkish surrounding word ("KAYIT") should match its lowercase
+    recognizer keyword ("kayıt") when the recognizer language is 'tr'/'az',
+    because 'I' (U+0049) must fold to 'ı' (U+0131) rather than 'i'. Without the
+    language, plain str.lower() yields "kayit" and the whole-word match fails.
+    """
+    context_list = ["KAYIT"]
+    recognizer_context_list = ["kayıt"]
+
+    # With the Turkish language the dotless-I fold makes the words equal.
+    result = LemmaContextAwareEnhancer._find_supportive_word_in_context(
+        context_list,
+        recognizer_context_list,
+        matching_mode="whole_word",
+        language="tr",
+    )
+    assert result == "kayıt"
+
+    # Azerbaijani shares the same dotted/dotless I casing rules.
+    result = LemmaContextAwareEnhancer._find_supportive_word_in_context(
+        context_list,
+        recognizer_context_list,
+        matching_mode="whole_word",
+        language="az",
+    )
+    assert result == "kayıt"
+
+    # Without a locale, str.lower() maps "KAYIT" -> "kayit" and the match fails.
+    result = LemmaContextAwareEnhancer._find_supportive_word_in_context(
+        context_list,
+        recognizer_context_list,
+        matching_mode="whole_word",
+    )
+    assert result == ""
+
+
 def test_when_context_word_multiple_matches_then_first_match_returned():
     """
     Test that when multiple context words match, the first one is returned.

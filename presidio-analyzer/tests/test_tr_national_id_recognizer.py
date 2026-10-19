@@ -1,6 +1,12 @@
 """Tests for Turkish National ID (TCKN) recognizer."""
 
 import pytest
+from presidio_analyzer import (
+    AnalysisExplanation,
+    LemmaContextAwareEnhancer,
+    RecognizerResult,
+)
+from presidio_analyzer.nlp_engine import NoOpNlpEngine
 from presidio_analyzer.predefined_recognizers import TrNationalIdRecognizer
 
 from tests import assert_result_within_score_range
@@ -169,3 +175,44 @@ def test_supported_entity(recognizer):
 def test_supported_language(recognizer):
     """Test that supported language is correctly set."""
     assert recognizer.supported_language == "tr"
+
+
+def test_uppercase_turkish_context_boosts_score(recognizer):
+    """Uppercase Turkish context words must boost the recognizer's score.
+
+    Turkish identity documents are written in uppercase, e.g. "TC KİMLİK NO".
+    ``str.lower`` is locale-independent and lowers "İ" (U+0130) to "i" plus a
+    combining dot, so "kimlik" is no longer a substring of the lowered text and
+    the recognizer's shipped context list never matches. The context enhancer
+    must case-fold with Turkish rules; before the fix this assertion fails
+    because the score stays at the pattern baseline.
+    """
+    text = "TC KİMLİK NO: 10000000146"
+    baseline_score = 0.3
+
+    # No-op artifacts carry no lemmas, so any boost must come from matching the
+    # explicitly supplied context against the recognizer's own context list.
+    nlp_engine = NoOpNlpEngine(models=[{"lang_code": "tr", "model_name": "no_op"}])
+    nlp_engine.load()
+    nlp_artifacts = nlp_engine.process_text(text, "tr")
+
+    result = RecognizerResult(
+        entity_type="TR_NATIONAL_ID",
+        start=14,
+        end=25,
+        score=baseline_score,
+        analysis_explanation=AnalysisExplanation(
+            recognizer=recognizer.name, original_score=baseline_score
+        ),
+        recognition_metadata={
+            RecognizerResult.RECOGNIZER_NAME_KEY: recognizer.name,
+            RecognizerResult.RECOGNIZER_IDENTIFIER_KEY: recognizer.id,
+        },
+    )
+
+    enhanced = LemmaContextAwareEnhancer().enhance_using_context(
+        text, [result], nlp_artifacts, [recognizer], context=["TC KİMLİK NO"]
+    )
+
+    assert enhanced[0].score > baseline_score
+    assert enhanced[0].analysis_explanation.supportive_context_word == "tc kimlik"

@@ -1,6 +1,12 @@
 """Tests for Turkish license plate (TR_LICENSE_PLATE) recognizer."""
 
 import pytest
+from presidio_analyzer import (
+    AnalysisExplanation,
+    LemmaContextAwareEnhancer,
+    RecognizerResult,
+)
+from presidio_analyzer.nlp_engine import NlpArtifacts, NoOpNlpEngine
 from presidio_analyzer.predefined_recognizers import TrLicensePlateRecognizer
 
 from tests import assert_result_within_score_range
@@ -122,3 +128,53 @@ def test_supported_entity(recognizer):
 def test_supported_language(recognizer):
     """Test that supported language is correctly set."""
     assert recognizer.supported_language == "tr"
+
+
+def test_uppercase_turkish_context_boosts_score(recognizer):
+    """An uppercase Turkish word near the plate must boost the score.
+
+    Turkish vehicle documents are written in uppercase, e.g. "KAYIT".
+    ``str.lower`` lowers the dotless-capital "I" (U+0049) to "i" instead of "ı"
+    (U+0131), so "KAYIT" becomes "kayit" and no longer matches the recognizer's
+    "kayıt" context word. The context enhancer must case-fold with Turkish
+    rules; before the fix this assertion fails because the surrounding word
+    never matches and the score stays at the pattern baseline.
+
+    The NlpArtifacts are built directly with a fixed lemma sequence so the
+    lemma-extraction path is exercised deterministically without depending on a
+    Turkish spaCy model.
+    """
+    text = "KAYIT 34ABC1234"
+    baseline_score = 0.3
+
+    nlp_engine = NoOpNlpEngine(models=[{"lang_code": "tr", "model_name": "no_op"}])
+    nlp_engine.load()
+    nlp_artifacts = NlpArtifacts(
+        entities=[],
+        tokens=["KAYIT", "34ABC1234"],
+        tokens_indices=[0, 6],
+        lemmas=["KAYIT", "34ABC1234"],
+        nlp_engine=nlp_engine,
+        language="tr",
+    )
+
+    result = RecognizerResult(
+        entity_type="TR_LICENSE_PLATE",
+        start=6,
+        end=15,
+        score=baseline_score,
+        analysis_explanation=AnalysisExplanation(
+            recognizer=recognizer.name, original_score=baseline_score
+        ),
+        recognition_metadata={
+            RecognizerResult.RECOGNIZER_NAME_KEY: recognizer.name,
+            RecognizerResult.RECOGNIZER_IDENTIFIER_KEY: recognizer.id,
+        },
+    )
+
+    enhanced = LemmaContextAwareEnhancer().enhance_using_context(
+        text, [result], nlp_artifacts, [recognizer]
+    )
+
+    assert enhanced[0].score > baseline_score
+    assert enhanced[0].analysis_explanation.supportive_context_word == "kayıt"
