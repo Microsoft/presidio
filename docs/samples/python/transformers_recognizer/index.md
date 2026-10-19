@@ -16,7 +16,7 @@ When initializing the `TransformersRecognizer`, choose from the following option
 3. Provide the path to your own local custom trained model.
 
 !!! note "Note"
-    For each combination of model & dataset, it is recommended to create a configuration object which includes setting necessary parameters for getting the correct results. Please reference this [configuration.py](https://github.com/data-privacy-stack/presidio/blob/main/configuration.py) file for examples.
+    For each combination of model & dataset, it is recommended to create a configuration object which includes setting necessary parameters for getting the correct results. Please reference this [configuration.py](https://github.com/data-privacy-stack/presidio/blob/main/docs/samples/python/transformers_recognizer/configuration.py) file for examples.
 
 ## Example Code
 

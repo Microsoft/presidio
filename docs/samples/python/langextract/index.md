@@ -19,7 +19,7 @@ Unlike pattern-based recognizers, language model-based detection is flexible and
 The default configuration includes examples for common PII/PHI entities such as PERSON, EMAIL_ADDRESS, PHONE_NUMBER, US_SSN, CREDIT_CARD, MEDICAL_LICENSE, and more. 
 **You can customize the prompts and examples to detect any entity types relevant to your use case**.
 
-For the default entity mappings and examples, see the [default configuration](https://github.com/data-privacy-stack/presidio/blob/main/presidio-analyzer/presidio_analyzer/conf/langextract_config_ollama.yaml).
+For the default entity mappings and examples, see the [default configuration](https://github.com/data-privacy-stack/presidio/blob/main/presidio-analyzer/presidio_analyzer/conf/langextract_config_basic.yaml).
 
 ## Supported Language Model Providers
 
@@ -107,7 +107,7 @@ You have two options to set up Ollama:
   > This option provides better performance with GPU acceleration (e.g., on Mac with Metal Performance Shaders or systems with NVIDIA GPUs).
   > The model must be pulled and run before using the recognizer. The default model is `qwen2.5:1.5b`.
 
-3. **Configuration** (optional): Create your own `ollama_config.yaml` or use the [default configuration](https://github.com/data-privacy-stack/presidio/blob/main//presidio-analyzer/presidio_analyzer/conf/langextract_config_ollama.yaml)
+3. **Configuration** (optional): Create your own `ollama_config.yaml` or use the [default configuration](https://github.com/data-privacy-stack/presidio/blob/main/presidio-analyzer/presidio_analyzer/conf/langextract_config_basic.yaml)
 
 ### Usage
 
@@ -176,7 +176,7 @@ The `langextract_config_ollama.yaml` file supports the following options:
 - **`entity_mappings`**: Map LangExtract entity classes to Presidio entity names
 - **`min_score`**: Minimum confidence score (default: `0.5`)
 
-See the [configuration file](https://github.com/data-privacy-stack/presidio/blob/main/presidio-analyzer/presidio_analyzer/conf/ollama_config.yaml) for all options.
+See the [configuration file](https://github.com/data-privacy-stack/presidio/blob/main/presidio-analyzer/presidio_analyzer/conf/langextract_config_basic.yaml) for all options.
 
 ## Troubleshooting
 

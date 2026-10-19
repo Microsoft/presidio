@@ -185,6 +185,6 @@ The AHDS operators gracefully handle missing dependencies and will be skipped if
 
 ## See Also
 
-- [Presidio Analyzer](../analyzer/index.md)
-- [Presidio Anonymizer](../anonymizer/index.md)
+- [Presidio Analyzer](analyzer/index.md)
+- [Presidio Anonymizer](anonymizer/index.md)
 - [Azure Health Data Services de-identification service documentation](https://learn.microsoft.com/azure/healthcare-apis/deidentification/)

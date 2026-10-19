@@ -6,7 +6,7 @@ This folder contains guides and samples for running Presidio in Microsoft Fabric
 
 1. [Environment Setup](env_setup.md) - How to set up your Fabric environment with the required dependencies.
 2. [Presidio and Spark Notebook](./artifacts/presidio_and_spark.ipynb) - The sample notebook demonstrating PII detection and anonymization using Presidio with Spark.
-3. [Sample Data](./fabric_sample_data.csv) - Example CSV data for testing the PII detection and anonymization workflow.
+3. [Sample Data](./data/fabric_sample_data.csv) - Example CSV data for testing the PII detection and anonymization workflow.
 
 ## Overview
 
