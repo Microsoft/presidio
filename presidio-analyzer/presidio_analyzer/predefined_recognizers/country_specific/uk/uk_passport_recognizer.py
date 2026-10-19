@@ -7,8 +7,8 @@ class UkPassportRecognizer(PatternRecognizer):
     """
     Recognizes UK passport numbers using regex.
 
-    UK passports issued from 2015 onwards use a 2-letter prefix
-    followed by 7 digits (e.g., AB1234567).
+    UK passport numbers are 9 digits (all numeric) for every series currently
+    in circulation, per HM Passport Office "Basic passport checks" (GOV.UK).
 
     :param patterns: List of patterns to be used by this recognizer
     :param context: List of context words to increase confidence in detection
@@ -20,9 +20,9 @@ class UkPassportRecognizer(PatternRecognizer):
 
     PATTERNS = [
         Pattern(
-            "UK Passport (weak)",
-            r"\b[A-Z]{2}\d{7}\b",
-            0.1,
+            "UK Passport (very weak)",
+            r"\b\d{9}\b",
+            0.05,
         ),
     ]
 

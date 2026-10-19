@@ -1,5 +1,6 @@
 import pytest
 from presidio_analyzer.predefined_recognizers import UkPassportRecognizer
+from presidio_analyzer.recognizer_registry import RecognizerRegistryProvider
 
 from tests.assertions import assert_result_within_score_range
 
@@ -20,45 +21,58 @@ def entities():
     "text, expected_len, expected_positions, expected_score_ranges",
     [
         # fmt: off
-        # Valid UK passport numbers (2 letters + 7 digits)
+        # Valid UK passport numbers (9 digits, all numeric)
         (
-            "AB1234567",
+            "123456789",
             1,
             ((0, 9),),
-            ((0.1, 0.1),),
+            ((0.05, 0.05),),
         ),
         (
-            "XY9876543",
+            "987654321",
             1,
             ((0, 9),),
-            ((0.1, 0.1),),
-        ),
-        # Lowercase (PatternRecognizer uses re.IGNORECASE)
-        (
-            "ab1234567",
-            1,
-            ((0, 9),),
-            ((0.1, 0.1),),
+            ((0.05, 0.05),),
         ),
         # Embedded in text
         (
-            "My passport number is CD7654321 and it expires soon",
+            "My passport number is 123456789 and it expires soon",
             1,
             ((22, 31),),
-            ((0.1, 0.1),),
+            ((0.05, 0.05),),
         ),
         # Multiple passport numbers
         (
-            "Passports: AB1234567 and XY9876543",
+            "Passports: 123456789 and 987654321",
             2,
             (
                 (11, 20),
                 (25, 34),
             ),
             (
-                (0.1, 0.1),
-                (0.1, 0.1),
+                (0.05, 0.05),
+                (0.05, 0.05),
             ),
+        ),
+        # Invalid: old (incorrect) 2-letters + 7-digits format
+        (
+            "AB1234567",
+            0,
+            (),
+            (),
+        ),
+        (
+            "XY9876543",
+            0,
+            (),
+            (),
+        ),
+        # Invalid: lowercase old format
+        (
+            "ab1234567",
+            0,
+            (),
+            (),
         ),
         # Invalid: 1 letter + 8 digits
         (
@@ -74,23 +88,23 @@ def entities():
             (),
             (),
         ),
-        # Invalid: too short (2 letters + 6 digits)
+        # Invalid: 3 letters + 7 digits
         (
-            "AB123456",
+            "GBR1234567",
             0,
             (),
             (),
         ),
-        # Invalid: too long (2 letters + 8 digits)
+        # Invalid: too short (8 digits)
         (
-            "AB12345678",
+            "12345678",
             0,
             (),
             (),
         ),
-        # Invalid: 9 digits only (old format excluded)
+        # Invalid: too long (10 digits)
         (
-            "123456789",
+            "1234567890",
             0,
             (),
             (),
@@ -111,7 +125,7 @@ def entities():
         ),
         # Invalid: embedded in alphanumeric word (no word boundary)
         (
-            "XYZAB1234567QRS",
+            "XYZ123456789QRS",
             0,
             (),
             (),
@@ -136,3 +150,30 @@ def test_when_passport_in_text_then_all_uk_passports_found(  # noqa: D103
         assert_result_within_score_range(
             res, entities[0], st_pos, fn_pos, st_score, fn_score
         )
+
+
+def test_recognizer_loads_and_detects_when_enabled_in_yaml():
+    """Detection must work through the path users actually configure."""
+    registry = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "UkPassportRecognizer",
+                    "supported_languages": ["en"],
+                    "type": "predefined",
+                    "enabled": True,
+                    "country_code": "uk",
+                }
+            ],
+        }
+    ).create_recognizer_registry()
+
+    recognizer = registry.get_recognizers(language="en", entities=["UK_PASSPORT"])
+    assert len(recognizer) == 1
+
+    results = recognizer[0].analyze("passport 123456789", entities=["UK_PASSPORT"])
+    assert len(results) == 1
+    assert results[0].entity_type == "UK_PASSPORT"
+    assert (results[0].start, results[0].end) == (9, 18)
+    assert results[0].score == pytest.approx(0.05)
