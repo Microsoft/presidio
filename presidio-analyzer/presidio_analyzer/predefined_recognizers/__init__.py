@@ -139,6 +139,9 @@ from .country_specific.turkey.tr_license_plate_recognizer import (
 from .country_specific.turkey.tr_national_id_recognizer import (
     TrNationalIdRecognizer,
 )
+from .country_specific.turkey.tr_tax_id_recognizer import (
+    TrTaxIdRecognizer,
+)
 
 # UK recognizers
 from .country_specific.uk.uk_driving_licence_recognizer import (
@@ -295,6 +298,7 @@ __all__ = [
     "ThTninRecognizer",
     "TrLicensePlateRecognizer",
     "TrNationalIdRecognizer",
+    "TrTaxIdRecognizer",
     "SePersonnummerRecognizer",
     "ZaCompanyRegistrationRecognizer",
     "ZaDriverLicenseRecognizer",

@@ -477,6 +477,13 @@ recognizers:
     enabled: false
     country_code: tr
 
+  - name: TrTaxIdRecognizer
+    supported_languages:
+    - tr
+    type: predefined
+    enabled: false
+    country_code: tr
+
   - name: PhUmidRecognizer
     supported_languages:
       - en
