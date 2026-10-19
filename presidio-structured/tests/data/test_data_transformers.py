@@ -1,5 +1,6 @@
 import pytest
 from pandas import DataFrame
+from presidio_anonymizer.entities import OperatorConfig
 from presidio_structured.config import StructuredAnalysis
 from presidio_structured.data.data_processors import (
     DataProcessorBase,
@@ -79,3 +80,20 @@ class TestJsonDataProcessor:
         processor = JsonDataProcessor()
         with pytest.raises(ValueError):
             processor.operate(sample_df, json_analysis, operators)
+
+    def test_process_top_level_list_applies_each_operator_once(self):
+        data = [
+            {"name": "Alice", "email": "alice@example.com"},
+            {"name": "Bob", "email": "bob@example.com"},
+        ]
+        analysis = StructuredAnalysis(
+            entity_mapping={"name": "PERSON", "email": "EMAIL_ADDRESS"}
+        )
+        # a non-idempotent operator, so a repeated application is visible
+        operators = {"DEFAULT": OperatorConfig("custom", {"lambda": lambda x: x + "!"})}
+        processor = JsonDataProcessor()
+        result = processor.operate(data, analysis, operators)
+        assert result == [
+            {"name": "Alice!", "email": "alice@example.com!"},
+            {"name": "Bob!", "email": "bob@example.com!"},
+        ]

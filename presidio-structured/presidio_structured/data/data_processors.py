@@ -198,24 +198,26 @@ class JsonDataProcessor(DataProcessorBase):
         if not isinstance(data, (dict, list)):
             raise ValueError("Data must be a JSON-like object")
 
+        # Handle a list of records once per item. Doing this inside the loop
+        # below re-processes the whole list for every mapped key, which applies
+        # each operator once per key instead of once per value.
+        if isinstance(data, list):
+            for item in data:
+                self._process(item, key_to_operator_mapping)
+            return data
+
         for key, operator_callable in key_to_operator_mapping.items():
             self.logger.debug(f"Operating on key {key}")
             keys = key.split(".")
-            if isinstance(data, list):
-                for item in data:
-                    self._process(item, key_to_operator_mapping)
-            else:
-                text_to_operate_on = self._get_nested_value(data, keys)
-                if text_to_operate_on:
-                    if isinstance(text_to_operate_on, list):
-                        for text in text_to_operate_on:
-                            operated_text = self._operate_on_text(
-                                text, operator_callable
-                            )
-                            self._set_nested_value(data, keys, operated_text)
-                    else:
-                        operated_text = self._operate_on_text(
-                            text_to_operate_on, operator_callable
-                        )
+            text_to_operate_on = self._get_nested_value(data, keys)
+            if text_to_operate_on:
+                if isinstance(text_to_operate_on, list):
+                    for text in text_to_operate_on:
+                        operated_text = self._operate_on_text(text, operator_callable)
                         self._set_nested_value(data, keys, operated_text)
+                else:
+                    operated_text = self._operate_on_text(
+                        text_to_operate_on, operator_callable
+                    )
+                    self._set_nested_value(data, keys, operated_text)
         return data
