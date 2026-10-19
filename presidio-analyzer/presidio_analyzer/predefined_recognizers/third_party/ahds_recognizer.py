@@ -18,6 +18,7 @@ try:
     from presidio_analyzer.llm_utils.azure_auth_helper import (
         get_azure_credential,
     )
+
     AZURE_AUTH_AVAILABLE = True
 except ImportError:  # pragma: no cover
     get_azure_credential = None
@@ -50,7 +51,6 @@ class AzureHealthDeidRecognizer(RemoteRecognizer):
             name=name if name else "Azure Health Data Services Deidentification",
             version="1.0.0",
         )
-
 
         endpoint = os.getenv("AHDS_ENDPOINT", None)
 
@@ -111,8 +111,7 @@ class AzureHealthDeidRecognizer(RemoteRecognizer):
             entities = self.supported_entities
 
         body = DeidentificationContent(
-            input_text=text,
-            operation_type=DeidentificationOperationType.TAG
+            input_text=text, operation_type=DeidentificationOperationType.TAG
         )
         result = self.deid_client.deidentify_text(body)
 
@@ -142,8 +141,8 @@ class AzureHealthDeidRecognizer(RemoteRecognizer):
             recognizer=AzureHealthDeidRecognizer.__class__.__name__,
             original_score=1.0,
             textual_explanation=(
-            f"Identified as {entity_type} by Azure Health Data Services "
-            "Deidentification"
+                f"Identified as {entity_type} by Azure Health Data Services "
+                "Deidentification"
             ),
         )
         return explanation

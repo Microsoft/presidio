@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from presidio_analyzer.llm_utils import lx_factory
-from presidio_analyzer.predefined_recognizers.third_party.\
-    langextract_recognizer import LangExtractRecognizer
+from presidio_analyzer.predefined_recognizers.third_party.langextract_recognizer import (  # noqa: E501  # noqa: E501
+    LangExtractRecognizer,
+)
 
 logger = logging.getLogger("presidio-analyzer")
 
@@ -15,10 +16,8 @@ DEFAULT_EXTRACT_PARAMS = {
     "fence_output": False,
 }
 
-DEFAULT_LANGUAGE_MODEL_PARAMS = {
-    "timeout": 240,
-    "num_ctx": 8192
-}
+DEFAULT_LANGUAGE_MODEL_PARAMS = {"timeout": 240, "num_ctx": 8192}
+
 
 class BasicLangExtractRecognizer(LangExtractRecognizer):
     """Basic LangExtract recognizer using configurable backend."""
@@ -33,7 +32,7 @@ class BasicLangExtractRecognizer(LangExtractRecognizer):
         supported_language: str = "en",
         context: Optional[list] = None,
         name="BasicLangExtractRecognizer",
-        **kwargs
+        **kwargs,
     ):
         """Initialize Basic LangExtract recognizer.
 
@@ -53,8 +52,8 @@ class BasicLangExtractRecognizer(LangExtractRecognizer):
             supported_language=supported_language,
             extract_params={
                 "extract": DEFAULT_EXTRACT_PARAMS,
-                "language_model": DEFAULT_LANGUAGE_MODEL_PARAMS
-            }
+                "language_model": DEFAULT_LANGUAGE_MODEL_PARAMS,
+            },
         )
 
         model_config: Dict[str, Any] = self.config.get("model", {})
@@ -82,11 +81,14 @@ class BasicLangExtractRecognizer(LangExtractRecognizer):
             self.provider_kwargs.setdefault(key, value)
 
         if not self.provider:
-            raise ValueError("Configuration must contain "
-                             "'langextract.model.provider.name'")
+            raise ValueError(
+                "Configuration must contain 'langextract.model.provider.name'"
+            )
 
-        if ("api_key" not in self.provider_kwargs
-                and "LANGEXTRACT_API_KEY" in os.environ):
+        if (
+            "api_key" not in self.provider_kwargs
+            and "LANGEXTRACT_API_KEY" in os.environ
+        ):
             self.provider_kwargs["api_key"] = os.environ["LANGEXTRACT_API_KEY"]
 
         self.lx_model_config = lx_factory.ModelConfig(

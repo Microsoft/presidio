@@ -1,4 +1,5 @@
 """Examples loading utilities for LLM recognizers."""
+
 import logging
 from typing import Dict, List
 
@@ -13,9 +14,7 @@ __all__ = [
 ]
 
 
-def load_yaml_examples(
-    examples_file: str, conf_subdir: str = "conf"
-) -> List[Dict]:
+def load_yaml_examples(examples_file: str, conf_subdir: str = "conf") -> List[Dict]:
     """Load and validate examples from YAML configuration file.
 
     :param examples_file: Path to YAML file with examples (repo-root-relative).

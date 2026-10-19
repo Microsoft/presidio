@@ -7,6 +7,7 @@ from typing import Optional
 
 try:
     import langextract as lx
+
     LANGEXTRACT_AVAILABLE = True
 except ImportError:  # pragma: no cover
     LANGEXTRACT_AVAILABLE = False

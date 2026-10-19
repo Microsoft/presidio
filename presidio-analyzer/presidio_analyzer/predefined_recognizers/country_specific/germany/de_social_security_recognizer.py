@@ -63,11 +63,11 @@ class DeSocialSecurityRecognizer(PatternRecognizer):
             "Rentenversicherungsnummer (Strict, with birth date structure)",
             r"\b\d{2}"
             r"(0[1-9]|[12]\d|3[01]|5[1-9]|[67]\d|8[01])"  # day: 01-31 or 51-81
-            r"(0[1-9]|1[0-2])"                              # month 01-12
-            r"\d{2}"                                  # year
-            r"[A-Z]"                                  # surname initial
-            r"\d{2}"                                  # serial
-            r"[0-9]\b",                               # check digit
+            r"(0[1-9]|1[0-2])"  # month 01-12
+            r"\d{2}"  # year
+            r"[A-Z]"  # surname initial
+            r"\d{2}"  # serial
+            r"[0-9]\b",  # check digit
             0.5,
         ),
         Pattern(

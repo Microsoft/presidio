@@ -27,7 +27,7 @@ class AnalysisBuilder(ABC):
         analyzer: Optional[AnalyzerEngine] = None,
         analyzer_score_threshold: Optional[float] = None,
         n_process: int = 1,
-        batch_size: int = 1
+        batch_size: int = 1,
     ) -> None:
         """Initialize the configuration generator.
 
@@ -105,7 +105,7 @@ class JsonAnalysisBuilder(AnalysisBuilder):
             input_dict=data,
             language=language,
             n_process=self.n_process,
-            batch_size=self.batch_size
+            batch_size=self.batch_size,
         )
 
         key_recognizer_result_map = self._generate_analysis_from_results_json(
@@ -256,7 +256,7 @@ class PandasAnalysisBuilder(TabularAnalysisBuilder):
                 [val for val in df[column]],
                 language=language,
                 n_process=self.n_process,
-                batch_size=self.batch_size
+                batch_size=self.batch_size,
             )
             column_analyzer_results_map[column] = analyzer_results
 

@@ -78,7 +78,6 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
             image_pil = Image.fromarray(image_np, mode="RGB")
         padded_image_pil = self._add_padding(image_pil, is_greyscale, padding_width)
 
-
         # Detect PII
         analyzer_results = self._get_analyzer_results(
             padded_image_pil,
@@ -661,9 +660,7 @@ class DicomImageRedactorEngine(ImageRedactorEngine):
                 value = text_metadata[i]
                 # Flatten MultiValue/list/tuple into individual elements
                 items = (
-                    value
-                    if isinstance(value, (MultiValue, list, tuple))
-                    else [value]
+                    value if isinstance(value, (MultiValue, list, tuple)) else [value]
                 )
                 for item in items:
                     text = str(item).strip()

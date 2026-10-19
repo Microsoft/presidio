@@ -3,6 +3,7 @@
 Based on gliner-spacy implementation:
 https://github.com/theirstory/gliner-spacy/blob/main/gliner_spacy/pipeline.py#L60-L96
 """
+
 import logging
 from typing import Iterable, List, Tuple
 

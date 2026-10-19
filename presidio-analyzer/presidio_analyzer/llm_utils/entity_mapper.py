@@ -1,4 +1,5 @@
 """Entity mapping and filtering utilities for LLM recognizers."""
+
 import logging
 from typing import List, Set
 
@@ -21,8 +22,7 @@ __all__ = [
 
 
 def filter_results_by_labels(
-    results: List[RecognizerResult],
-    labels_to_ignore: List[str]
+    results: List[RecognizerResult], labels_to_ignore: List[str]
 ) -> List[RecognizerResult]:
     """Filter out results with ignored entity labels.
 
@@ -41,7 +41,9 @@ def filter_results_by_labels(
         if result.entity_type.lower() in labels_to_ignore_lower:
             logger.debug(
                 "Entity %s at [%d:%d] is in labels_to_ignore, skipping",
-                result.entity_type, result.start, result.end
+                result.entity_type,
+                result.start,
+                result.end,
             )
             continue
 
@@ -51,8 +53,7 @@ def filter_results_by_labels(
 
 
 def filter_results_by_score(
-    results: List[RecognizerResult],
-    min_score: float
+    results: List[RecognizerResult], min_score: float
 ) -> List[RecognizerResult]:
     """Filter out results below minimum confidence score.
 
@@ -66,8 +67,11 @@ def filter_results_by_score(
         if result.score < min_score:
             logger.debug(
                 "Entity %s at [%d:%d] below min_score (%.2f < %.2f), skipping",
-                result.entity_type, result.start, result.end,
-                result.score, min_score
+                result.entity_type,
+                result.start,
+                result.end,
+                result.score,
+                min_score,
             )
             continue
 
@@ -77,8 +81,7 @@ def filter_results_by_score(
 
 
 def filter_results_by_entities(
-    results: List[RecognizerResult],
-    requested_entities: List[str]
+    results: List[RecognizerResult], requested_entities: List[str]
 ) -> List[RecognizerResult]:
     """Filter results to only include requested entity types.
 
@@ -95,7 +98,10 @@ def filter_results_by_entities(
         if result.entity_type not in requested_entities:
             logger.debug(
                 "Entity %s at [%d:%d] not in requested entities %s, skipping",
-                result.entity_type, result.start, result.end, requested_entities
+                result.entity_type,
+                result.start,
+                result.end,
+                requested_entities,
             )
             continue
 
@@ -105,7 +111,7 @@ def filter_results_by_entities(
 
 
 def validate_result_positions(
-    results: List[RecognizerResult]
+    results: List[RecognizerResult],
 ) -> List[RecognizerResult]:
     """Filter out results with invalid or missing start/end positions.
 
@@ -129,7 +135,7 @@ def validate_result_positions(
 def consolidate_generic_entities(
     results: List[RecognizerResult],
     supported_entities: List[str],
-    generic_entities_logged: Set[str]
+    generic_entities_logged: Set[str],
 ) -> List[RecognizerResult]:
     """Consolidate unmapped entity types to GENERIC_PII_ENTITY.
 
@@ -167,8 +173,7 @@ def consolidate_generic_entities(
 
 
 def skip_unmapped_entities(
-    results: List[RecognizerResult],
-    supported_entities: List[str]
+    results: List[RecognizerResult], supported_entities: List[str]
 ) -> List[RecognizerResult]:
     """Skip unmapped entities instead of consolidating them.
 
@@ -195,8 +200,7 @@ def skip_unmapped_entities(
 
 
 def ensure_generic_entity_support(
-    supported_entities: List[str],
-    enable_generic_consolidation: bool
+    supported_entities: List[str], enable_generic_consolidation: bool
 ) -> List[str]:
     """Ensure GENERIC_PII_ENTITY is in supported entities list if consolidation enabled.
 

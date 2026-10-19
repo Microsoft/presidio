@@ -1,4 +1,5 @@
 """Prompt loading and rendering utilities for LLM recognizers."""
+
 import logging
 
 from .config_loader import resolve_config_path

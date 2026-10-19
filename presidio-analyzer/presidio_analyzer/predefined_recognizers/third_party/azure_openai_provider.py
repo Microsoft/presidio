@@ -8,6 +8,7 @@ try:
     import langextract as lx
     import openai
     from langextract.providers.openai import OpenAILanguageModel
+
     LANGEXTRACT_OPENAI_AVAILABLE = True
 except ImportError:  # pragma: no cover
     LANGEXTRACT_OPENAI_AVAILABLE = False
@@ -20,6 +21,7 @@ try:
         get_azure_credential,
         get_bearer_token_provider_for_scope,
     )
+
     AZURE_IDENTITY_AVAILABLE = True
 except ImportError:  # pragma: no cover
     AZURE_IDENTITY_AVAILABLE = False
@@ -30,6 +32,7 @@ logger = logging.getLogger("presidio-analyzer")
 
 
 if LANGEXTRACT_OPENAI_AVAILABLE:
+
     class AzureOpenAILanguageModel(OpenAILanguageModel):
         """
         Custom LangExtract provider for Azure OpenAI.
@@ -50,7 +53,7 @@ if LANGEXTRACT_OPENAI_AVAILABLE:
             api_version: Optional[str] = None,
             azure_deployment: Optional[str] = None,
             azure_ad_token_provider: Optional[any] = None,
-            **kwargs
+            **kwargs,
         ):
             """
             Initialize Azure OpenAI provider.
@@ -77,9 +80,9 @@ if LANGEXTRACT_OPENAI_AVAILABLE:
             self.model_id = clean_model_id
             self.api_key = api_key or os.environ.get("AZURE_OPENAI_API_KEY")
             self.organization = None
-            self.format_type = kwargs.get('format_type', lx.data.FormatType.JSON)
-            self.temperature = kwargs.get('temperature', 0.0)
-            self.max_workers = kwargs.get('max_workers', 10)
+            self.format_type = kwargs.get("format_type", lx.data.FormatType.JSON)
+            self.temperature = kwargs.get("temperature", 0.0)
+            self.max_workers = kwargs.get("max_workers", 10)
             self._extra_kwargs = kwargs
 
             # Azure-specific configuration
@@ -92,13 +95,10 @@ if LANGEXTRACT_OPENAI_AVAILABLE:
             self.azure_deployment = azure_deployment or clean_model_id
 
             # Validate and initialize Azure OpenAI client
-            self._client = self._create_azure_openai_client(
-                azure_ad_token_provider
-            )
+            self._client = self._create_azure_openai_client(azure_ad_token_provider)
 
         def _create_azure_openai_client(
-            self,
-            azure_ad_token_provider: Optional[any] = None
+            self, azure_ad_token_provider: Optional[any] = None
         ):
             """
             Create and configure Azure OpenAI client with appropriate authentication.
@@ -130,14 +130,14 @@ if LANGEXTRACT_OPENAI_AVAILABLE:
                     )
                     credential_type = (
                         "DefaultAzureCredential (development)"
-                        if os.getenv('ENV') == 'development'
+                        if os.getenv("ENV") == "development"
                         else "ChainedTokenCredential"
                     )
 
                 client = openai.AzureOpenAI(
                     azure_ad_token_provider=token_provider,
                     azure_endpoint=self.azure_endpoint,
-                    api_version=self.api_version
+                    api_version=self.api_version,
                 )
 
                 logger.debug(
@@ -148,7 +148,7 @@ if LANGEXTRACT_OPENAI_AVAILABLE:
                 client = openai.AzureOpenAI(
                     api_key=self.api_key,
                     azure_endpoint=self.azure_endpoint,
-                    api_version=self.api_version
+                    api_version=self.api_version,
                 )
 
                 logger.debug(
@@ -166,6 +166,7 @@ if LANGEXTRACT_OPENAI_AVAILABLE:
             """
             return self.azure_deployment
 else:  # pragma: no cover
+
     class AzureOpenAILanguageModel:
         """Placeholder when langextract is not installed."""
 
@@ -180,10 +181,8 @@ else:  # pragma: no cover
 # Register the provider with LangExtract
 if LANGEXTRACT_OPENAI_AVAILABLE:
     try:
-        @lx.providers.registry.register(
-            r'^azure:',
-            priority=20
-        )
+
+        @lx.providers.registry.register(r"^azure:", priority=20)
         class RegisteredAzureOpenAILanguageModel(AzureOpenAILanguageModel):
             """
             Registered version of Azure OpenAI provider for LangExtract.

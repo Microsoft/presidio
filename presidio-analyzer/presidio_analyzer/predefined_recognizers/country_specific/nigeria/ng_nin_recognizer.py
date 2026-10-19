@@ -62,9 +62,7 @@ class NgNinRecognizer(PatternRecognizer):
 
     def __check_nin(self, value: str) -> bool:
         return (
-            len(value) == 11
-            and value.isnumeric()
-            and self._is_verhoeff_number(value)
+            len(value) == 11 and value.isnumeric() and self._is_verhoeff_number(value)
         )
 
     @staticmethod

@@ -86,7 +86,7 @@ class Server:
                     texts=batch,
                     batch_size=min(
                         len(batch),
-                        int(os.environ.get("BATCH_SIZE", DEFAULT_BATCH_SIZE))
+                        int(os.environ.get("BATCH_SIZE", DEFAULT_BATCH_SIZE)),
                     ),
                     language=req_data.language,
                     correlation_id=req_data.correlation_id,
@@ -99,9 +99,8 @@ class Server:
                     allow_list_match=req_data.allow_list_match,
                     regex_flags=req_data.regex_flags,
                     n_process=min(
-                        len(batch),
-                        int(os.environ.get("N_PROCESS", DEFAULT_N_PROCESS))
-                    )
+                        len(batch), int(os.environ.get("N_PROCESS", DEFAULT_N_PROCESS))
+                    ),
                 )
                 results = []
                 for recognizer_result_list in iterator:

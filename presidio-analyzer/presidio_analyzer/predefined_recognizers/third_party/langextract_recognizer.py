@@ -67,13 +67,11 @@ class LangExtractRecognizer(LMRecognizer, ABC):
                 ("langextract", "entity_mappings"),
                 ("langextract", "prompt_file"),
                 ("langextract", "examples_file"),
-            ]
+            ],
         )
 
         self.config = langextract_config
-        model_config = get_model_config(
-            full_config, provider_key="langextract"
-        )
+        model_config = get_model_config(full_config, provider_key="langextract")
 
         super().__init__(
             supported_entities=supported_entities,
@@ -84,19 +82,13 @@ class LangExtractRecognizer(LMRecognizer, ABC):
             temperature=model_config.get("temperature"),
             min_score=lm_config.get("min_score"),
             labels_to_ignore=lm_config.get("labels_to_ignore"),
-            enable_generic_consolidation=lm_config.get(
-                "enable_generic_consolidation"
-            ),
+            enable_generic_consolidation=lm_config.get("enable_generic_consolidation"),
         )
 
-        examples_data = load_yaml_examples(
-            langextract_config["examples_file"]
-        )
+        examples_data = load_yaml_examples(langextract_config["examples_file"])
         self.examples = convert_to_langextract_format(examples_data)
 
-        prompt_template = load_prompt_file(
-            langextract_config["prompt_file"]
-        )
+        prompt_template = load_prompt_file(langextract_config["prompt_file"])
         self.prompt_description = render_jinja_template(
             prompt_template,
             supported_entities=self.supported_entities,
@@ -120,11 +112,11 @@ class LangExtractRecognizer(LMRecognizer, ABC):
                     )
 
             if "language_model" in extract_params:
-                for param_name, default_value in (
-                    extract_params["language_model"].items()
-                ):
-                    self._language_model_params[param_name] = (
-                        self._model_config.get(param_name, default_value)
+                for param_name, default_value in extract_params[
+                    "language_model"
+                ].items():
+                    self._language_model_params[param_name] = self._model_config.get(
+                        param_name, default_value
                     )
 
     def _call_llm(self, text: str, entities: List[str], **kwargs):
@@ -151,7 +143,7 @@ class LangExtractRecognizer(LMRecognizer, ABC):
             entity_mappings=self.entity_mappings,
             supported_entities=self.supported_entities,
             enable_generic_consolidation=self.enable_generic_consolidation,
-            recognizer_name=self.__class__.__name__
+            recognizer_name=self.__class__.__name__,
         )
 
     def _call_langextract(self, **kwargs):
@@ -172,8 +164,7 @@ class LangExtractRecognizer(LMRecognizer, ABC):
             return lx.extract(**extract_params)
         except Exception:
             logger.exception(
-                "LangExtract extraction failed (model '%s')",
-                self.model_id
+                "LangExtract extraction failed (model '%s')", self.model_id
             )
             raise
 

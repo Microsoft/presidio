@@ -104,9 +104,7 @@ def threshold_value(value: str) -> float:
         raise argparse.ArgumentTypeError("threshold must be a float") from e
 
     if not 0.0 <= threshold <= 1.0:
-        raise argparse.ArgumentTypeError(
-            "threshold must be between 0.0 and 1.0"
-        )
+        raise argparse.ArgumentTypeError("threshold must be between 0.0 and 1.0")
 
     return threshold
 

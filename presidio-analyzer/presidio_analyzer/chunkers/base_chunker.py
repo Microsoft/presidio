@@ -1,4 +1,5 @@
 """Abstract base class for text chunking strategies."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, List

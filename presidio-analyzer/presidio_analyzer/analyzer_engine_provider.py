@@ -61,8 +61,7 @@ class AnalyzerEngineProvider:
                     configuration = yaml.safe_load(file)
             except OSError:
                 logger.warning(
-                    f"configuration file {conf_file} not found.  "
-                    f"Using default config."
+                    f"configuration file {conf_file} not found.  Using default config."
                 )
                 with open(self._get_full_conf_path()) as file:
                     configuration = yaml.safe_load(file)

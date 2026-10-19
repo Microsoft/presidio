@@ -73,9 +73,9 @@ def _analyze(
     :param buffer: str, string to read from
     :param conf: presidio_cli configuration object
     """
-    assert hasattr(
-        buffer, "__getitem__"
-    ), "_run() argument must be a buffer, not a stream"
+    assert hasattr(buffer, "__getitem__"), (
+        "_run() argument must be a buffer, not a stream"
+    )
 
     for line in line_generator(buffer):
         for result in conf.analyzer.analyze(

@@ -48,7 +48,7 @@ class MacAddressRecognizer(PatternRecognizer):
             patterns=patterns,
             context=context,
             supported_language=supported_language,
-            name=name
+            name=name,
         )
 
     def invalidate_result(self, pattern_text: str) -> bool:
@@ -59,7 +59,7 @@ class MacAddressRecognizer(PatternRecognizer):
         :return: True if invalidated (invalid MAC address)
         """
         # Remove separators and validate hex characters and length
-        cleaned = re.sub(r'[:\-.]', '', pattern_text)
+        cleaned = re.sub(r"[:\-.]", "", pattern_text)
 
         # All characters must be valid hex
         if re.fullmatch(r"[0-9A-Fa-f]{12}", cleaned) is None:
@@ -67,7 +67,7 @@ class MacAddressRecognizer(PatternRecognizer):
 
         # Optionally reject broadcast/multicast addresses if needed
         # Broadcast: FF:FF:FF:FF:FF:FF
-        if cleaned.upper() == 'FFFFFFFFFFFF' or cleaned.upper() == '000000000000':
+        if cleaned.upper() == "FFFFFFFFFFFF" or cleaned.upper() == "000000000000":
             return True
 
         return False

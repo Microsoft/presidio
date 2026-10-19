@@ -53,27 +53,29 @@ class DeBsnrRecognizer(PatternRecognizer):
     # Valid KV regional codes per KBV Arztnummern-Richtlinie Anlage 1.
     # Includes the standard 17 KV regions, the KBV itself, and Anlage-8 BMV-Ä
     # special codes for Krankenhäuser.
-    VALID_KV_CODES = frozenset({
-        "01",  # Schleswig-Holstein
-        "02",  # Hamburg
-        "03",  # Bremen
-        "17",  # Niedersachsen
-        "20",  # Westfalen-Lippe
-        "35",  # Krankenhäuser (Anlage 8 BMV-Ä)
-        "38",  # Nordrhein
-        "46",  # Hessen
-        "51",  # Rheinland-Pfalz
-        "52",  # Baden-Württemberg
-        "71",  # Bayern
-        "72",  # Berlin
-        "73",  # Saarland
-        "74",  # KBV (Kassenärztliche Bundesvereinigung)
-        "78",  # Mecklenburg-Vorpommern
-        "83",  # Brandenburg
-        "88",  # Sachsen-Anhalt
-        "93",  # Thüringen
-        "98",  # Sachsen
-    })
+    VALID_KV_CODES = frozenset(
+        {
+            "01",  # Schleswig-Holstein
+            "02",  # Hamburg
+            "03",  # Bremen
+            "17",  # Niedersachsen
+            "20",  # Westfalen-Lippe
+            "35",  # Krankenhäuser (Anlage 8 BMV-Ä)
+            "38",  # Nordrhein
+            "46",  # Hessen
+            "51",  # Rheinland-Pfalz
+            "52",  # Baden-Württemberg
+            "71",  # Bayern
+            "72",  # Berlin
+            "73",  # Saarland
+            "74",  # KBV (Kassenärztliche Bundesvereinigung)
+            "78",  # Mecklenburg-Vorpommern
+            "83",  # Brandenburg
+            "88",  # Sachsen-Anhalt
+            "93",  # Thüringen
+            "98",  # Sachsen
+        }
+    )
 
     PATTERNS = [
         Pattern(

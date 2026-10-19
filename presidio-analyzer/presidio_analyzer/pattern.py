@@ -34,9 +34,7 @@ class Pattern:
     @staticmethod
     def __validate_score(score: float) -> None:
         if score < 0 or score > 1:
-            raise ValueError(
-                f"Invalid score: {score}. " "Score should be between 0 and 1"
-            )
+            raise ValueError(f"Invalid score: {score}. Score should be between 0 and 1")
 
     def to_dict(self) -> Dict:
         """

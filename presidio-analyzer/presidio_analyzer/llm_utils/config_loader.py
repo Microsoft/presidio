@@ -1,4 +1,5 @@
 """Configuration loading utilities for LLM recognizers."""
+
 import logging
 from pathlib import Path
 from typing import Dict, List, Union
@@ -93,7 +94,7 @@ def get_model_config(config: Dict, provider_key: str) -> Dict:
             (provider_key,),
             (provider_key, "model"),
             (provider_key, "model", "model_id"),
-        ]
+        ],
     )
 
     return config[provider_key]["model"]
@@ -102,7 +103,7 @@ def get_model_config(config: Dict, provider_key: str) -> Dict:
 def validate_config_fields(
     config: Dict,
     required_fields: List[Union[str, tuple]],
-    config_name: str = "Configuration"
+    config_name: str = "Configuration",
 ) -> None:
     """Validate that required fields exist in configuration.
 
@@ -119,7 +120,7 @@ def validate_config_fields(
             current = config
             for i, key in enumerate(field):
                 if not isinstance(current, dict) or key not in current:
-                    path = ".".join(field[:i+1])
+                    path = ".".join(field[: i + 1])
                     raise ValueError(f"{config_name} must contain '{path}'")
                 current = current[key]
                 if i == len(field) - 1 and not current:

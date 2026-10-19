@@ -72,10 +72,7 @@ class LMRecognizer(RemoteRecognizer, ABC):
 
     @abstractmethod
     def _call_llm(
-        self,
-        text: str,
-        entities: List[str],
-        **kwargs
+        self, text: str, entities: List[str], **kwargs
     ) -> List[RecognizerResult]:
         """
         Call LLM service and return RecognizerResult objects.
@@ -92,7 +89,7 @@ class LMRecognizer(RemoteRecognizer, ABC):
         self,
         text: str,
         entities: Optional[List[str]] = None,
-        nlp_artifacts: Optional["NlpArtifacts"] = None
+        nlp_artifacts: Optional["NlpArtifacts"] = None,
     ) -> List[RecognizerResult]:
         """Analyze text for PII/PHI using LLM."""
         if not text or not text.strip():
@@ -107,15 +104,14 @@ class LMRecognizer(RemoteRecognizer, ABC):
         if not requested_entities:
             logger.debug(
                 "No requested entities (%s) match supported entities (%s)",
-                entities, self.supported_entities
+                entities,
+                self.supported_entities,
             )
             return []
 
         results = self._call_llm(text, requested_entities)
 
-        filtered_results = self._filter_and_process_results(
-            results, requested_entities
-        )
+        filtered_results = self._filter_and_process_results(results, requested_entities)
 
         if filtered_results:
             logger.debug(
@@ -128,27 +124,23 @@ class LMRecognizer(RemoteRecognizer, ABC):
     def _filter_and_process_results(
         self,
         results: List[RecognizerResult],
-        requested_entities: Optional[List[str]] = None
+        requested_entities: Optional[List[str]] = None,
     ) -> List[RecognizerResult]:
         """Filter and process results."""
         filtered_results = filter_results_by_labels(results, self.labels_to_ignore)
 
         if self.enable_generic_consolidation:
             filtered_results = consolidate_generic_entities(
-                filtered_results,
-                self.supported_entities,
-                self._generic_entities_logged
+                filtered_results, self.supported_entities, self._generic_entities_logged
             )
         else:
             filtered_results = skip_unmapped_entities(
-                filtered_results,
-                self.supported_entities
+                filtered_results, self.supported_entities
             )
 
         if requested_entities:
             filtered_results = filter_results_by_entities(
-                filtered_results,
-                requested_entities
+                filtered_results, requested_entities
             )
 
         filtered_results = validate_result_positions(filtered_results)

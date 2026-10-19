@@ -65,8 +65,18 @@ class FiPersonalIdentityCodeRecognizer(PatternRecognizer):
         # against the full year.
         century_by_separator = {
             "+": 1800,
-            "-": 1900, "Y": 1900, "X": 1900, "W": 1900, "V": 1900, "U": 1900,
-            "A": 2000, "B": 2000, "C": 2000, "D": 2000, "E": 2000, "F": 2000,
+            "-": 1900,
+            "Y": 1900,
+            "X": 1900,
+            "W": 1900,
+            "V": 1900,
+            "U": 1900,
+            "A": 2000,
+            "B": 2000,
+            "C": 2000,
+            "D": 2000,
+            "E": 2000,
+            "F": 2000,
         }
         # The separator is constrained to the keys above by the pattern, so a
         # default is only a safeguard for direct calls with other text.

@@ -15,6 +15,7 @@ try:
         ManagedIdentityCredential,
         WorkloadIdentityCredential,
     )
+
     AZURE_IDENTITY_AVAILABLE = True
 except ImportError:  # pragma: no cover
     AZURE_IDENTITY_AVAILABLE = False
@@ -53,7 +54,7 @@ def get_azure_credential() -> "TokenCredential":
             "Install it with: pip install azure-identity"
         )
 
-    if os.getenv('ENV') == 'development':
+    if os.getenv("ENV") == "development":
         credential = DefaultAzureCredential()  # CodeQL [SM05139] OK for dev
         logger.debug("Using DefaultAzureCredential (development mode)")
         return credential
@@ -61,15 +62,14 @@ def get_azure_credential() -> "TokenCredential":
         credential = ChainedTokenCredential(
             EnvironmentCredential(),
             WorkloadIdentityCredential(),
-            ManagedIdentityCredential()
+            ManagedIdentityCredential(),
         )
         logger.debug("Using ChainedTokenCredential (production mode)")
         return credential
 
 
 def get_bearer_token_provider_for_scope(
-    scope: str,
-    credential: Optional["TokenCredential"] = None
+    scope: str, credential: Optional["TokenCredential"] = None
 ):
     """
     Get a bearer token provider function for a specific Azure scope.

@@ -1,4 +1,5 @@
 """LangExtract helper utilities."""
+
 import logging
 from typing import Dict, List, Optional
 
@@ -69,8 +70,7 @@ def extract_lm_config(config: Dict) -> Dict:
 
 
 def get_supported_entities(
-    lm_config: Dict,
-    langextract_config: Dict
+    lm_config: Dict, langextract_config: Dict
 ) -> Optional[List[str]]:
     """Get supported entities list, checking LM config first then LangExtract config.
 
@@ -78,9 +78,8 @@ def get_supported_entities(
     :param langextract_config: LangExtract configuration dictionary.
     :return: List of supported entity types, or None if not specified.
     """
-    return (
-        lm_config.get("supported_entities")
-        or langextract_config.get("supported_entities")
+    return lm_config.get("supported_entities") or langextract_config.get(
+        "supported_entities"
     )
 
 
@@ -94,8 +93,7 @@ def create_reverse_entity_mapping(entity_mappings: Dict) -> Dict:
 
 
 def calculate_extraction_confidence(
-    extraction,
-    alignment_scores: Optional[Dict[str, float]] = None
+    extraction, alignment_scores: Optional[Dict[str, float]] = None
 ) -> float:
     """Calculate confidence score based on extraction alignment status.
 
@@ -108,9 +106,7 @@ def calculate_extraction_confidence(
     if alignment_scores is None:
         alignment_scores = DEFAULT_ALIGNMENT_SCORES
 
-    if not hasattr(extraction, "alignment_status") or not (
-        extraction.alignment_status
-    ):
+    if not hasattr(extraction, "alignment_status") or not (extraction.alignment_status):
         return default_score
 
     status = str(extraction.alignment_status).upper()
@@ -127,7 +123,7 @@ def convert_langextract_to_presidio_results(
     supported_entities: List[str],
     enable_generic_consolidation: bool,
     recognizer_name: str,
-    alignment_scores: Optional[Dict[str, float]] = None
+    alignment_scores: Optional[Dict[str, float]] = None,
 ) -> List[RecognizerResult]:
     """Convert LangExtract extraction results to Presidio RecognizerResult objects.
 
@@ -177,17 +173,16 @@ def convert_langextract_to_presidio_results(
         confidence = calculate_extraction_confidence(extraction, alignment_scores)
 
         metadata = {}
-        if hasattr(extraction, 'attributes') and extraction.attributes:
-            metadata['attributes'] = extraction.attributes
-        if hasattr(extraction, 'alignment_status') and extraction.alignment_status:
-            metadata['alignment'] = str(extraction.alignment_status)
+        if hasattr(extraction, "attributes") and extraction.attributes:
+            metadata["attributes"] = extraction.attributes
+        if hasattr(extraction, "alignment_status") and extraction.alignment_status:
+            metadata["alignment"] = str(extraction.alignment_status)
 
         explanation = AnalysisExplanation(
             recognizer=recognizer_name,
             original_score=confidence,
             textual_explanation=(
-                f"LangExtract extraction with "
-                f"{extraction.alignment_status} alignment"
+                f"LangExtract extraction with {extraction.alignment_status} alignment"
                 if hasattr(extraction, "alignment_status")
                 and extraction.alignment_status
                 else "LangExtract extraction"
@@ -200,7 +195,7 @@ def convert_langextract_to_presidio_results(
             end=extraction.char_interval.end_pos,
             score=confidence,
             analysis_explanation=explanation,
-            recognition_metadata=metadata if metadata else None
+            recognition_metadata=metadata if metadata else None,
         )
 
         results.append(result)
