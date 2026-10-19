@@ -23,9 +23,17 @@ class UrlRecognizer(PatternRecognizer):
     PATTERNS = [
         Pattern("Standard Url", "(?i)(?:https?://)" + BASE_URL_REGEX, 0.6),
         Pattern("Non schema URL", "(?i)" + BASE_URL_REGEX, 0.5),
-        Pattern("Quoted URL", r'(?i)["\'](https?://' + BASE_URL_REGEX + r')["\']', 0.6),
+        # The quotes are matched with lookarounds so they delimit the URL
+        # without becoming part of the detected span.
         Pattern(
-            "Quoted Non-schema URL", r'(?i)["\'](' + BASE_URL_REGEX + r')["\']', 0.5
+            "Quoted URL",
+            r'(?i)(?<=["\'])(https?://' + BASE_URL_REGEX + r')(?=["\'])',
+            0.6,
+        ),
+        Pattern(
+            "Quoted Non-schema URL",
+            r'(?i)(?<=["\'])(' + BASE_URL_REGEX + r')(?=["\'])',
+            0.5,
         ),
     ]
 

@@ -32,8 +32,12 @@ def entities():
         ("https://www.microsoft.com/store/abc/", 1, ((0, 36),), 0.6,),
         ("microsoft.com", 1, ((0, 13),), 0.5,),
         ("my domains: microsoft.com google.co.il", 2, ((12, 25), (26, 38),), 0.5),
-        ('"https://presidio.dataprivacystack.org/"', 1, ((0, 40),), 0.6),
-        ("'https://presidio.dataprivacystack.org/'", 1, ((0, 40),), 0.6),
+        # Quoted URLs: the surrounding quotes are not part of the URL
+        ('"https://presidio.dataprivacystack.org/"', 1, ((1, 39),), 0.6),
+        ("'https://presidio.dataprivacystack.org/'", 1, ((1, 39),), 0.6),
+        ('"www.example.com"', 1, ((1, 16),), 0.5),
+        ('{"website": "https://example.com/profile/42"}', 1, ((13, 43),), 0.6),
+        ("<a href='https://example.com/profile/42'>profile</a>", 1, ((9, 39),), 0.6),
 
         # Invalid URLs
         ("www.microsoft", 0, (), 0),
