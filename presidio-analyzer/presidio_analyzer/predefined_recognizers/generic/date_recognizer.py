@@ -1,6 +1,15 @@
+import re
+from datetime import date
 from typing import List, Optional
 
 from presidio_analyzer import Pattern, PatternRecognizer
+
+_MONTHS = {
+    month: number
+    for number, month in enumerate(
+        "JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC".split(), start=1
+    )
+}
 
 
 class DateRecognizer(PatternRecognizer):
@@ -100,3 +109,47 @@ class DateRecognizer(PatternRecognizer):
             supported_language=supported_language,
             name=name,
         )
+
+    def invalidate_result(self, pattern_text: str) -> bool:
+        """
+        Drop matches that cannot be a real calendar date, such as 2021-02-30.
+
+        The numeric patterns overlap (dd/mm and mm/dd), so a match is only
+        dropped when no reading of its parts (year-month-day, month-day-year
+        or day-month-year) is a valid date.
+
+        :param pattern_text: Text detected as pattern by regex
+        :return: True if the text cannot be a real date
+        """
+        month_name = re.search(r"[A-Za-z]{3}", pattern_text)
+        numbers = [int(n) for n in re.findall(r"\d+", pattern_text.split("T")[0])]
+        if month_name:
+            month = _MONTHS.get(month_name.group().upper())
+            if month is None or not re.match(r"\d", pattern_text):
+                return False  # month-year only: nothing to check
+            if len(numbers) == 1:
+                readings = [(2000, month, numbers[0])]  # no year: allow 29 Feb
+            else:
+                readings = [(numbers[1], month, numbers[0])]
+        elif len(numbers) == 3:
+            first, second, third = numbers
+            if re.match(r"\d{4}\D", pattern_text):
+                readings = [(first, second, third)]
+            else:
+                readings = [(third, first, second), (third, second, first)]
+        else:
+            return False
+
+        return not any(self._is_date(*reading) for reading in readings)
+
+    @staticmethod
+    def _is_date(year: int, month: int, day: int) -> bool:
+        # A two-digit year may be 19xx or 20xx; only 00 differs for leap years.
+        years = [year] if year >= 100 else [1900 + year, 2000 + year]
+        for y in years:
+            try:
+                date(y, month, day)
+                return True
+            except ValueError:
+                continue
+        return False

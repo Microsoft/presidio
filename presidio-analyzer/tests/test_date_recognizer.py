@@ -88,3 +88,35 @@ def test_when_all_dates_then_succeed(
         assert_result_within_score_range(
             res, entities[0], st_pos, fn_pos, st_score, fn_score
         )
+
+
+@pytest.mark.parametrize(
+    "date_text",
+    [
+        "2021-02-30",
+        "2021/02/30",
+        "31/04/2021",
+        "04-31-2021",
+        "29.02.2023",
+        "30-FEB-2024",
+        "29-FEB-2023",
+        "31-FEB",
+        "2023-02-29T10:30:00Z",
+    ],
+)
+def test_when_date_is_impossible_then_full_match_is_dropped(date_text, recognizer, entities):
+    text = f"Today is {date_text}"
+    results = recognizer.analyze(text, entities)
+    assert recognizer.invalidate_result(date_text)
+    assert all(text[r.start : r.end] != date_text for r in results)
+
+
+@pytest.mark.parametrize(
+    "date_text",
+    ["2020-02-29", "02/29/2020", "29/02/2020", "29.02.00", "29-FEB-2020", "29-FEB", "12/31/2020", "31/12/2020"],
+)
+def test_when_date_is_valid_edge_case_then_detected(date_text, recognizer, entities):
+    text = f"Today is {date_text}"
+    results = recognizer.analyze(text, entities)
+    assert not recognizer.invalidate_result(date_text)
+    assert any(text[r.start : r.end] == date_text for r in results)
