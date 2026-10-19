@@ -165,6 +165,17 @@ For a detailed flow of Named Entities within presidio, see the diagram [in this 
 The `ContextAwareEnhancer` is a module that enhances the detection of entities by using the context of the text. The `ContextAwareEnhancer` can be used to improve the detection of entities that are dependent on the context of the text, such as dates, locations, and more. The default implementation is the `LemmaContextAwareEnhancer` which uses the lemmas of the tokens in the text to enhance the detection of entities. Note that it's possible (and sometimes recommended) to create custom `ContextAwareEnhancer` objects to fit the specific needs of the user, for example if the context should support more than one word, which is currently not supported by the default Lemma based enhancer.
 More information on this can be found [in this sample](../samples/python/customizing_presidio_analyzer.ipynb).
 
+A recognizer defines its context words via the `context` constructor argument (or the `context` key in a recognizer YAML entry). By default this is a flat list of words shared by all entities the recognizer supports. When one recognizer supports several entity types, `context` can instead be a dict mapping each entity type to its own list of context words, so that words for one entity do not boost detections of another entity from the same recognizer. For example:
+
+```python
+context={
+    "ACCOUNTNUMBER": ["account", "checking", "savings"],
+    "US_ITIN": ["tax", "itin", "taxpayer"],
+}
+```
+
+Entity types with no entry in the dict get no context words.
+
 ## Creating PII recognizers
 
 Presidio analyzer can be easily extended to support additional PII entities.

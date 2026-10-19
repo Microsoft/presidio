@@ -1,7 +1,6 @@
 import logging
 from abc import abstractmethod
-from itertools import groupby
-from typing import TYPE_CHECKING, ClassVar, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, ClassVar, Dict, List, Optional, Tuple, Union
 
 from presidio_analyzer import RecognizerResult
 from presidio_analyzer.score_thresholds import normalize_score_thresholds
@@ -29,8 +28,12 @@ class EntityRecognizer:
     The supported language code is iso6391Name
     :param name: the name of this recognizer (optional)
     :param version: the recognizer current version
-    :param context: a list of words which can help boost confidence score
-    when they appear in context of the matched entity
+    :param context: words which can help boost confidence score
+    when they appear in context of the matched entity.
+    Either a flat list of words shared by all supported entities,
+    or a dict mapping each supported entity type to its own list of
+    context words, so that context words for one entity do not boost
+    detections of another entity from the same recognizer.
     :param country_code: Optional ISO 3166-1 alpha-2 country tag. Custom
         recognizers may set it per instance; predefined recognizers should
         prefer the class-level :attr:`COUNTRY_CODE`. Values are stripped,
@@ -54,7 +57,7 @@ class EntityRecognizer:
         name: str = None,
         supported_language: str = "en",
         version: str = "0.0.1",
-        context: Optional[List[str]] = None,
+        context: Optional[Union[List[str], Dict[str, List[str]]]] = None,
         country_code: Optional[str] = None,
         score_thresholds: Optional[Dict[str, float]] = None,
     ):
@@ -70,7 +73,7 @@ class EntityRecognizer:
         self.supported_language = supported_language
         self.version = version
         self.is_loaded = False
-        self.context = context if context else []
+        self.context = self._validate_context(context)
         self.score_thresholds = score_thresholds
 
         self._country_code = self._resolve_country_code(country_code)
@@ -91,6 +94,49 @@ class EntityRecognizer:
         :param value: The default and entity-specific score thresholds.
         """
         self._score_thresholds = normalize_score_thresholds(value)
+
+    @staticmethod
+    def _validate_context(
+        context: Optional[Union[List[str], Dict[str, List[str]]]],
+    ) -> Union[List[str], Dict[str, List[str]]]:
+        """Validate and normalize the recognizer's context words.
+
+        :param context: Either a flat list of words shared by all supported
+            entities, a dict mapping each supported entity type to its own
+            list of context words, or None.
+        :return: The validated context (a list or a dict), or [] if None.
+        :raises TypeError: If context is neither a list nor a dict.
+        :raises ValueError: If the structure or contents are invalid.
+        """
+        if context is None:
+            return []
+        if isinstance(context, dict):
+            validated = {}
+            for entity_type, words in context.items():
+                if not isinstance(entity_type, str) or not entity_type:
+                    raise ValueError(
+                        "Context word dict keys must be non-empty entity type "
+                        f"strings, got {entity_type!r}."
+                    )
+                if not isinstance(words, (list, tuple)) or not all(
+                    isinstance(word, str) for word in words
+                ):
+                    raise ValueError(
+                        f"Context words for entity {entity_type!r} must be a "
+                        f"list of strings, got {words!r}."
+                    )
+                validated[entity_type] = list(words)
+            return validated
+        if isinstance(context, (list, tuple)):
+            if not all(isinstance(word, str) for word in context):
+                raise ValueError(
+                    f"Context words must be a list of strings, got {context!r}."
+                )
+            return list(context)
+        raise TypeError(
+            "context must be a list of strings or a dict mapping entity "
+            f"types to lists of strings, got {type(context).__name__}."
+        )
 
     @classmethod
     def _resolve_country_code(cls, passed: Optional[str]) -> Optional[str]:

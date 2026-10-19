@@ -63,7 +63,7 @@ class RecognizerListLoader:
     @staticmethod
     def _get_recognizer_context(
         recognizer: Union[Dict[str, Any], str],
-    ) -> Optional[List[str]]:
+    ) -> Optional[Union[List[str], Dict[str, List[str]]]]:
         if isinstance(recognizer, str):
             return None
         return recognizer.get("context", None)

@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from presidio_analyzer import EntityRecognizer, RecognizerResult
 from presidio_analyzer.context_aware_enhancers import ContextAwareEnhancer
@@ -118,12 +118,21 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                 )
                 continue
 
-            # skip recognizer result if the recognizer doesn't support
-            # context enhancement
-            if not recognizer.context:
+            # A recognizer may define its context words as a flat list shared
+            # by all its entities, or as a dict mapping each entity type to
+            # its own list of context words. Only boost the result with the
+            # words applicable to its entity type.
+            recognizer_context = self._get_context_words_for_entity(
+                recognizer.context, result.entity_type
+            )
+
+            # skip recognizer result if the recognizer doesn't define
+            # context words for this entity type
+            if not recognizer_context:
                 logger.debug(
-                    "recognizer '%s' does not support context enhancement",
+                    "recognizer '%s' does not define context words for entity '%s'",
                     recognizer.name,
+                    result.entity_type,
                 )
                 continue
 
@@ -145,7 +154,7 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
             surrounding_words.extend(context)
 
             supportive_context_word = self._find_supportive_word_in_context(
-                surrounding_words, recognizer.context, self.context_matching_mode
+                surrounding_words, recognizer_context, self.context_matching_mode
             )
             if supportive_context_word != "":
                 result.score += self.context_similarity_factor
@@ -159,6 +168,29 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                 )
                 result.analysis_explanation.set_improved_score(result.score)
         return results
+
+    @staticmethod
+    def _get_context_words_for_entity(
+        context: Optional[Union[List[str], Dict[str, List[str]]]],
+        entity_type: str,
+    ) -> List[str]:
+        """Return the context words applicable to a result's entity type.
+
+        A recognizer may define its context words as a flat list shared by
+        all supported entities, or as a dict mapping each entity type to its
+        own list of context words. In the dict form, an entity type with no
+        entry gets no context words, so words for one entity cannot boost
+        detections of another entity from the same recognizer.
+
+        :param context: The recognizer's context words (list, dict, or None).
+        :param entity_type: The entity type of the result being enhanced.
+        :return: The list of context words to match against.
+        """
+        if not context:
+            return []
+        if isinstance(context, dict):
+            return list(context.get(entity_type) or [])
+        return list(context)
 
     @staticmethod
     def _find_supportive_word_in_context(

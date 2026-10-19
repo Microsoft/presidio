@@ -19,8 +19,13 @@ class LanguageContextConfig(BaseModel):
     """
 
     language: str = Field(..., description="Language code (e.g., 'en', 'es')")
-    context: Optional[List[str]] = Field(
-        default=None, description="Context words for this language"
+    context: Optional[Union[List[str], Dict[str, List[str]]]] = Field(
+        default=None,
+        description=(
+            "Context words for this language: either a flat list shared by "
+            "all entities, or a dict mapping each entity type to its own "
+            "list of context words."
+        ),
     )
 
     @field_validator("language")
@@ -72,8 +77,13 @@ class BaseRecognizerConfig(BaseModel):
             description="Multiple supported languages with optional context",
         )
     )
-    context: Optional[List[str]] = Field(
-        default=None, description="Global context words"
+    context: Optional[Union[List[str], Dict[str, List[str]]]] = Field(
+        default=None,
+        description=(
+            "Context words: either a flat list shared by all entities, "
+            "or a dict mapping each entity type to its own list of "
+            "context words."
+        ),
     )
     supported_entity: Optional[str] = Field(
         default=None, description="Supported entity for this recognizer"
@@ -358,8 +368,13 @@ class CustomRecognizerConfig(BaseRecognizerConfig):
     patterns: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="List of patterns"
     )
-    context: Optional[List[str]] = Field(
-        default=None, description="Global context words"
+    context: Optional[Union[List[str], Dict[str, List[str]]]] = Field(
+        default=None,
+        description=(
+            "Context words: either a flat list shared by all entities, "
+            "or a dict mapping each entity type to its own list of "
+            "context words."
+        ),
     )
     deny_list: Optional[List[str]] = Field(
         default=None, description="Words to deny/exclude"

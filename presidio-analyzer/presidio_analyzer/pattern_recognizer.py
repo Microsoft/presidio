@@ -1,7 +1,7 @@
 import datetime
 import logging
 import os
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import regex as re
 
@@ -54,7 +54,7 @@ class PatternRecognizer(LocalRecognizer):
         supported_language: str = "en",
         patterns: List[Pattern] = None,
         deny_list: List[str] = None,
-        context: List[str] = None,
+        context: Optional[Union[List[str], Dict[str, List[str]]]] = None,
         deny_list_score: float = 1.0,
         global_regex_flags: Optional[int] = re.DOTALL | re.MULTILINE | re.IGNORECASE,
         version: str = "0.0.1",
@@ -80,7 +80,7 @@ class PatternRecognizer(LocalRecognizer):
             self.patterns = []
         else:
             self.patterns = patterns
-        self.context = context
+        self.context = EntityRecognizer._validate_context(context)
         self.deny_list_score = deny_list_score
         self.global_regex_flags = global_regex_flags
 
