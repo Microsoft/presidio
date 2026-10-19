@@ -8,7 +8,8 @@ from inspect import signature
 from presidio_analyzer.predefined_recognizers import SpacyRecognizer
 from presidio_analyzer.recognizer_registry import RecognizerRegistryProvider
 from presidio_analyzer.recognizer_registry.recognizers_loader_utils import RecognizerConfigurationLoader
-from presidio_analyzer import RecognizerRegistry
+from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+from tests.mocks import NlpEngineMock
 
 
 def assert_default_configuration(
@@ -115,6 +116,67 @@ def test_recognizer_registry_provider_explicit_deny_list_score_is_honored():
 
     assert recognizer.deny_list_score == 0.3
     assert all(pattern.score == 0.3 for pattern in recognizer.patterns)
+
+
+def test_recognizer_registry_provider_yaml_pattern_capture_group_reaches_recognizer(
+    tmp_path,
+):
+    conf = tmp_path / "recognizers.yaml"
+    conf.write_text(
+        r"""
+supported_languages:
+  - en
+recognizers:
+  - name: PasswordRecognizer
+    type: custom
+    supported_language: en
+    supported_entity: PASSWORD
+    patterns:
+      - name: password value
+        regex: "password:\\s*(?P<value>\\S+)"
+        score: 0.5
+        capture_group: value
+"""
+    )
+
+    registry = RecognizerRegistryProvider(conf_file=conf).create_recognizer_registry()
+    analyzer = AnalyzerEngine(registry=registry, nlp_engine=NlpEngineMock())
+
+    results = analyzer.analyze("my password: hunter2", language="en")
+
+    assert registry.recognizers[0].patterns[0].capture_group == "value"
+    assert [
+        (result.entity_type, result.start, result.end, result.score)
+        for result in results
+    ] == [("PASSWORD", 13, 20, 0.5)]
+
+
+def test_recognizer_registry_provider_rejects_invalid_pattern_capture_group():
+    with pytest.raises(ValueError) as exc_info:
+        RecognizerRegistryProvider(
+            registry_configuration={
+                "supported_languages": ["en"],
+                "recognizers": [
+                    {
+                        "name": "PasswordRecognizer",
+                        "supported_entity": "PASSWORD",
+                        "patterns": [
+                            {
+                                "name": "password value",
+                                "regex": r"password:\s*(\S+)",
+                                "score": 0.5,
+                                "capture_group": 2,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+    assert (
+        "Invalid pattern 'password value': capture_group 2 is out of range: "
+        "regex defines 1 capture group(s)"
+    ) in str(exc_info.value.__cause__)
 
 
 def test_recognizer_registry_provider_omitted_thresholds_default_to_empty():

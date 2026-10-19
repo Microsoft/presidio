@@ -1,7 +1,7 @@
 import datetime
 import logging
 import os
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import regex as re
 
@@ -139,6 +139,7 @@ class PatternRecognizer(LocalRecognizer):
 
         :param pattern_text: the text to validated.
         Only the part in text that was detected by the regex engine
+        (the pattern's capture group if set, otherwise the whole match)
         :return: A bool indicating whether the validation was successful.
         """
         return None
@@ -151,6 +152,7 @@ class PatternRecognizer(LocalRecognizer):
 
         :param pattern_text: the text to validated.
         Only the part in text that was detected by the regex engine
+        (the pattern's capture group if set, otherwise the whole match)
         :return: A bool indicating whether the result is invalidated
         """
         return None
@@ -190,6 +192,12 @@ class PatternRecognizer(LocalRecognizer):
         )
         return explanation
 
+    @staticmethod
+    def __regex_has_group(compiled_regex, capture_group: Union[int, str]) -> bool:
+        if isinstance(capture_group, str):
+            return capture_group in compiled_regex.groupindex
+        return capture_group <= compiled_regex.groups
+
     def __analyze_patterns(
         self, text: str, flags: int = None
     ) -> List[RecognizerResult]:
@@ -212,6 +220,19 @@ class PatternRecognizer(LocalRecognizer):
                 pattern.compiled_with_flags = flags
                 pattern.compiled_regex = re.compile(pattern.regex, flags=flags)
 
+            # Flags such as re.VERBOSE can change the groups in a regex
+            if pattern.capture_group is not None and not self.__regex_has_group(
+                pattern.compiled_regex, pattern.capture_group
+            ):
+                logger.warning(
+                    "Regex pattern '%s' has no capture group %r "
+                    "when compiled with the regex flags in use, skipping.",
+                    pattern.name,
+                    pattern.capture_group,
+                )
+                continue
+            group = 0 if pattern.capture_group is None else pattern.capture_group
+
             try:
                 matches = pattern.compiled_regex.finditer(
                     text, timeout=REGEX_TIMEOUT_SECONDS
@@ -224,10 +245,11 @@ class PatternRecognizer(LocalRecognizer):
                 )
 
                 for match in matches:
-                    start, end = match.span()
+                    start, end = match.span(group)
                     current_match = text[start:end]
 
-                    # Skip empty results
+                    # Skip empty results, including a capture group that did not
+                    # participate in the match (its span is (-1, -1))
                     if current_match == "":
                         continue
 

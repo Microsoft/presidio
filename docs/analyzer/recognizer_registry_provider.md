@@ -105,7 +105,19 @@ The recognizer list comprises of both the predefined and custom recognizers, for
   In addition to the language code, this field also contains a list of context words, which increases confidence in the detection in case it is found in the surroundings of a detected entity (as seen in the credit card example above).
   - `type`: this could be either predefined or custom. As this is optional, if not stated otherwise, the default type is custom.
   - `name`: Different per the type of the recognizer. For predefined recognizers, this is the class name as defined in presidio, while for custom recognizers, it will be set as the name of the recognizer.
-  - `patterns`: a list of objects of type `Pattern` that contains a name, score and regex that define matching patterns.
+  - `patterns`: a list of objects of type `Pattern` that contains a name, score and regex that define matching patterns. A pattern can also set an optional `capture_group`: the number or the name of a capture group in the regex. When set, only the text matched by this group is detected instead of the whole match, and matches in which the group does not participate are skipped. An unknown group fails validation when the configuration is loaded. This check does not apply `global_regex_flags`. See [detecting part of a regex match](./adding_recognizers.md#detecting-part-of-a-regex-match). Example:
+
+    ```yaml
+    - name: PasswordRecognizer
+      type: custom
+      supported_language: en
+      supported_entity: PASSWORD
+      patterns:
+        - name: password (value only)
+          regex: "password:\\s*(?P<value>\\S+)"
+          score: 0.5
+          capture_group: value
+    ```
   - `enabled`: enables or disables the recognizer.
   - `supported_entity`: the detected entity associated by the recognizer.
   - `deny_list`: A list of words to detect, in case the recognizer uses a predefined list of words.

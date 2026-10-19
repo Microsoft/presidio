@@ -570,6 +570,12 @@ components:
           type: number
           format: double
           description: "Detection confidence of this pattern (0.01 if very noisy, 0.6-1.0 if very specific)"
+        capture_group:
+          oneOf:
+            - type: integer
+              minimum: 0
+            - type: string
+          description: "Number or name of a capture group in the regex. If set, only the text matched by this group is returned as the detected entity, and matches in which the group does not participate are skipped. If omitted, the whole match is returned. The group is checked against the regex without regex flags: if the flags used at analysis time (for example re.VERBOSE) remove the group, the pattern detects nothing."
 
 
     PatternRecognizer:

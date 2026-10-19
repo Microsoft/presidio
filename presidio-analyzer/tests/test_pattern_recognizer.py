@@ -565,3 +565,159 @@ def test_regex_timeout_seconds_env_var_override():
     # Restore the module to default state
     importlib.reload(pr_module)
 
+
+@pytest.mark.parametrize(
+    "regex, capture_group, expected_start, expected_end",
+    [
+        (r"Password: (\w+)", None, 0, 14),
+        (r"Password: (\w+)", 0, 0, 14),
+        (r"Password: (\w+)", 1, 10, 14),
+        (r"Password: (?P<password>\w+)", "password", 10, 14),
+    ],
+)
+def test_when_capture_group_given_then_result_spans_that_group_or_whole_match(
+    regex, capture_group, expected_start, expected_end
+):
+    recognizer = PatternRecognizer(
+        supported_entity="PASSWORD",
+        patterns=[
+            Pattern(
+                name="password", regex=regex, score=0.5, capture_group=capture_group
+            )
+        ],
+    )
+
+    results = recognizer.analyze("Password: 1234", ["PASSWORD"])
+
+    assert len(results) == 1
+    assert_result(results[0], "PASSWORD", expected_start, expected_end, 0.5)
+
+
+@pytest.mark.parametrize(
+    "text, expected_spans",
+    [
+        ("id", []),
+        ("id:", []),
+        ("id: 42", [(4, 6)]),
+    ],
+)
+def test_when_capture_group_does_not_participate_or_is_empty_then_match_is_skipped(
+    text, expected_spans
+):
+    recognizer = PatternRecognizer(
+        supported_entity="ID",
+        patterns=[
+            Pattern(name="id", regex=r"\bid(?:(:) ?(\d*))?", score=0.5, capture_group=2)
+        ],
+    )
+
+    results = recognizer.analyze(text, ["ID"])
+
+    assert [(result.start, result.end) for result in results] == expected_spans
+
+
+def test_when_capture_group_set_then_validation_hooks_receive_group_text():
+    received = []
+
+    class RecordingRecognizer(PatternRecognizer):
+        def validate_result(self, pattern_text):
+            received.append(("validate", pattern_text))
+            return None
+
+        def invalidate_result(self, pattern_text):
+            received.append(("invalidate", pattern_text))
+            return None
+
+    recognizer = RecordingRecognizer(
+        supported_entity="PASSWORD",
+        patterns=[
+            Pattern(
+                name="password", regex=r"Password: (\w+)", score=0.5, capture_group=1
+            )
+        ],
+    )
+
+    recognizer.analyze("Password: 1234", ["PASSWORD"])
+
+    assert received == [("validate", "1234"), ("invalidate", "1234")]
+
+
+def test_when_same_regex_uses_different_capture_groups_then_each_group_is_reported():
+    regex = r"(\w+)@(\w+)\.com"
+    recognizer = PatternRecognizer(
+        supported_entity="EMAIL_PART",
+        patterns=[
+            Pattern(name="user", regex=regex, score=0.4, capture_group=1),
+            Pattern(name="domain", regex=regex, score=0.4, capture_group=2),
+        ],
+    )
+
+    results = recognizer.analyze("mail john@example.com", ["EMAIL_PART"])
+
+    assert sorted((result.start, result.end) for result in results) == [
+        (5, 9),
+        (10, 17),
+    ]
+
+
+@pytest.mark.parametrize("capture_group", [2, "b"])
+def test_when_regex_flags_remove_capture_group_then_pattern_is_skipped_with_warning(
+    caplog, capture_group
+):
+    # With re.VERBOSE, "# (?P<b>b)" is a comment, so the regex has only one group
+    verbose_dependent = Pattern(
+        name="verbose_dependent",
+        regex=r"(secret\w*) # (?P<b>b)",
+        score=0.5,
+        capture_group=capture_group,
+    )
+    plain = Pattern(name="plain", regex=r"\b\d+\b", score=0.6)
+    recognizer = PatternRecognizer(
+        supported_entity="TEST",
+        patterns=[verbose_dependent, plain],
+        global_regex_flags=re.VERBOSE,
+    )
+
+    with caplog.at_level("WARNING", logger="presidio-analyzer"):
+        results = recognizer.analyze("secretvalue 123 secretother", ["TEST"])
+
+    assert [(result.start, result.end, result.score) for result in results] == [
+        (12, 15, 0.6)
+    ]
+    # Logged once per analyze call, not once per match
+    warning = (
+        f"Regex pattern 'verbose_dependent' has no capture group {capture_group!r} "
+        "when compiled with the regex flags in use, skipping."
+    )
+    assert caplog.text.count(warning) == 1
+    assert "secretvalue" not in caplog.text
+    assert "secretother" not in caplog.text
+
+    # The warning does not depend on the text containing a candidate match
+    caplog.clear()
+    with caplog.at_level("WARNING", logger="presidio-analyzer"):
+        assert recognizer.analyze("no candidates here", ["TEST"]) == []
+    assert caplog.text.count(warning) == 1
+
+
+def test_when_capture_group_set_then_recognizer_round_trips_through_dict():
+    recognizer_dict = {
+        "supported_entity": "PASSWORD",
+        "patterns": [
+            {
+                "name": "password",
+                "regex": r"Password: (?P<password>\w+)",
+                "score": 0.5,
+                "capture_group": "password",
+            }
+        ],
+    }
+
+    recognizer = PatternRecognizer.from_dict(recognizer_dict)
+    restored = PatternRecognizer.from_dict(recognizer.to_dict())
+
+    assert recognizer.patterns[0].capture_group == "password"
+    assert recognizer.to_dict()["patterns"] == recognizer_dict["patterns"]
+    results = restored.analyze("Password: 1234", ["PASSWORD"])
+    assert len(results) == 1
+    assert_result(results[0], "PASSWORD", 10, 14, 0.5)

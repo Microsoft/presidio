@@ -479,6 +479,84 @@ def test_custom_recognizer_config_invalid_score_range():
             )
 
 
+@pytest.mark.parametrize(
+    "regex, capture_group",
+    [
+        (r"id: (\d+)", 1),
+        (r"id: (?P<value>\d+)", "value"),
+        (r"id: (\d+)", None),
+    ],
+)
+def test_custom_recognizer_config_pattern_capture_group_valid(regex, capture_group):
+    """A capture_group that exists in the regex is accepted and kept in the dump."""
+    pattern = {
+        "name": "test",
+        "regex": regex,
+        "score": 0.5,
+        "capture_group": capture_group,
+    }
+    config = CustomRecognizerConfig(
+        name="test",
+        supported_entity="TEST",
+        patterns=[pattern]
+    )
+
+    assert config.model_dump()["patterns"] == [pattern]
+
+
+@pytest.mark.parametrize(
+    "regex, capture_group, expected_message",
+    [
+        (
+            r"id: (\d+)",
+            2,
+            "Invalid pattern 'test': capture_group 2 is out of range: "
+            "regex defines 1 capture group(s)",
+        ),
+        (
+            r"id: (?P<value>\d+)",
+            "number",
+            "Invalid pattern 'test': capture_group 'number' is not a named group "
+            "in the regex. Named groups: ['value']",
+        ),
+        (
+            r"id: (\d+)",
+            -1,
+            "Invalid pattern 'test': capture_group must be a non-negative integer, "
+            "got -1",
+        ),
+        (
+            r"id: (\d+)",
+            True,
+            "Invalid pattern 'test': capture_group must be an int or a str, got bool",
+        ),
+        (
+            r"id: (\d+)",
+            [1],
+            "Invalid pattern 'test': capture_group must be an int or a str, got list",
+        ),
+    ],
+)
+def test_custom_recognizer_config_pattern_capture_group_invalid(
+    regex, capture_group, expected_message
+):
+    """An invalid capture_group fails at parse time with an actionable message."""
+    pattern = {
+        "name": "test",
+        "regex": regex,
+        "score": 0.5,
+        "capture_group": capture_group,
+    }
+    with pytest.raises(ValidationError) as exc_info:
+        CustomRecognizerConfig(
+            name="test",
+            supported_entity="TEST",
+            patterns=[pattern]
+        )
+
+    assert expected_message in str(exc_info.value)
+
+
 def test_custom_recognizer_config_no_patterns_or_deny_list():
     """Test that custom recognizer must have patterns or deny_list."""
     with pytest.raises(ValidationError) as exc_info:

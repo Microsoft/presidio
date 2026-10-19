@@ -190,6 +190,34 @@ class TestAnalyzerRequest:
         assert isinstance(request.ad_hoc_recognizers[0], PatternRecognizer)
         assert request.ad_hoc_recognizers[0].supported_entities == ["CUSTOM_ID"]
 
+    def test_analyzer_request_with_ad_hoc_recognizer_capture_group(self):
+        """Test that a pattern capture_group reaches the ad-hoc recognizer."""
+        req_data = {
+            "text": "Employee ID-12345",
+            "language": "en",
+            "ad_hoc_recognizers": [
+                {
+                    "supported_entity": "CUSTOM_ID",
+                    "supported_language": "en",
+                    "patterns": [
+                        {
+                            "name": "id_pattern",
+                            "regex": r"ID-(\d{5})",
+                            "score": 0.8,
+                            "capture_group": 1
+                        }
+                    ]
+                }
+            ]
+        }
+
+        request = AnalyzerRequest(req_data)
+
+        recognizer = request.ad_hoc_recognizers[0]
+        assert recognizer.patterns[0].capture_group == 1
+        results = recognizer.analyze(request.text, ["CUSTOM_ID"])
+        assert [(result.start, result.end) for result in results] == [(12, 17)]
+
     def test_analyzer_request_without_ad_hoc_recognizers(self):
         """Test that ad_hoc_recognizers is empty list when not provided."""
         req_data = {

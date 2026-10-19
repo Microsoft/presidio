@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Literal, Optional, Type, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from presidio_analyzer import Pattern
 from presidio_analyzer.input_validation import validate_language_codes
 from presidio_analyzer.recognizer_registry.recognizers_loader_utils import (
     PredefinedRecognizerNotFoundError,
@@ -446,6 +447,12 @@ class CustomRecognizerConfig(BaseRecognizerConfig):
                 raise ValueError(f"Pattern score should be a float: {pattern}")
             if not (0.0 <= pattern["score"] <= 1.0):
                 raise ValueError(f"Pattern score should be between 0 and 1: {pattern}")
+            if pattern.get("capture_group") is not None:
+                # Build the Pattern to check the group against the compiled regex
+                try:
+                    Pattern.from_dict(pattern)
+                except (TypeError, ValueError) as e:
+                    raise ValueError(f"Invalid pattern {pattern['name']!r}: {e}") from e
         return patterns
 
     @model_validator(mode="after")

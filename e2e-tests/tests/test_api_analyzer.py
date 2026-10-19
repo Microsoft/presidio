@@ -466,6 +466,45 @@ def test_given_ad_hoc_pattern_recognizer_context_raises_confidence():
 
 
 @pytest.mark.api
+def test_given_ad_hoc_pattern_recognizer_with_capture_group_then_only_the_group_is_returned():
+    request_body = r"""
+     {
+         "text": "John Smith drivers license is AC432223. Zip code: 10023",
+         "language": "en",
+         "ad_hoc_recognizers":[
+             {
+                "name": "Zip code Recognizer",
+                "supported_language": "en",
+                "patterns": [
+                    {
+                    "name": "zip code (after label)",
+                    "regex": "zip code: (\\d{5})",
+                    "score": 0.01,
+                    "capture_group": 1
+                    }
+                ],
+                "supported_entity":"ZIP"
+            }
+        ]
+     }
+     """
+
+    response_status, response_content = analyze(request_body)
+
+    expected_response = """
+     [
+         {"entity_type": "PERSON", "start": 0, "end": 10, "score": 0.85, "analysis_explanation":null},
+         {"entity_type": "US_DRIVER_LICENSE", "start": 30, "end": 38, "score": 0.6499999999999999, "analysis_explanation":null},
+         {"entity_type": "ZIP", "start": 50, "end": 55, "score": 0.01, "analysis_explanation":null}
+     ]
+     """
+    assert response_status == 200
+    assert equal_json_strings(
+        expected_response, response_content
+    )
+
+
+@pytest.mark.api
 def test_given_ad_hoc_deny_list_recognizer_the_right_entities_are_returned():
     request_body = r"""
     {

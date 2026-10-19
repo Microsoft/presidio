@@ -98,6 +98,42 @@ engine = AnalyzerEngine(registry=registry)
 engine.analyze(...)
 ```
 
+### Detecting part of a regex match
+
+By default, a pattern detects the whole regex match.
+To detect only part of it, such as a password without the `password:` label before it,
+set `capture_group` on the `Pattern` to the number or the name of a capture group in the regex:
+
+```python
+from presidio_analyzer import Pattern, PatternRecognizer
+
+password_pattern = Pattern(
+    name="password (value only)",
+    regex=r"password:\s*(?P<value>\S+)",
+    score=0.5,
+    capture_group="value",
+)
+password_recognizer = PatternRecognizer(
+    supported_entity="PASSWORD", patterns=[password_pattern]
+)
+
+# Detects "hunter2" (start=13, end=20) instead of "password: hunter2"
+results = password_recognizer.analyze(text="my password: hunter2", entities=["PASSWORD"])
+print(results)
+```
+
+Notes:
+
+- `capture_group` is optional. It accepts a group number (`0` is the whole match) or a group name, and is checked against the regex when the `Pattern` is created.
+- This check does not apply regex flags. If the flags used at analysis time change the groups of the regex (for example, with `re.VERBOSE` the text after `#` is a comment), a pattern whose group no longer exists detects nothing and logs a warning, and a group number can refer to a different group. Group names are never renumbered, so prefer them in this case.
+- Matches in which the group does not participate, such as an optional group that did not match, are skipped.
+- A pattern detects a single group. To detect several groups of the same regex, define one pattern per group.
+- `validate_result` and `invalidate_result` receive the text of the group.
+- Words matched by the regex outside the group count as surrounding text, so they can raise the score of the result if they are context words of the recognizer.
+- Recognizers that replace the pattern matching logic of `PatternRecognizer` (for example, `IbanRecognizer`) ignore `capture_group`.
+
+The same field can be set in [ad-hoc recognizers](#creating-ad-hoc-recognizers) and in [recognizers loaded from YAML](./recognizer_registry_provider.md#the-recognizer-parameters).
+
 ### Creating a new `EntityRecognizer` in code
 
 To create a new recognizer via code:

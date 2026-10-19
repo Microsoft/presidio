@@ -216,3 +216,47 @@ def test_when_context_custom_recognizer_then_succeed(spacy_nlp_engine, mock_nlp_
     assert len(results_without_context) == len(results_with_context)
     for res_wo, res_w in zip(results_without_context, results_with_context):
         assert res_wo.score < res_w.score
+
+
+def test_when_capture_group_narrows_span_then_matched_words_before_group_are_context(
+    spacy_nlp_engine, lemma_context
+):
+    """Words matched by the regex before the capture group act as context.
+
+    The result starts at the capture group, so "password" (matched by the
+    regex but outside the group) is a preceding word for context enhancement.
+    """
+    text = "my password: hunter2"
+    patterns = [
+        Pattern("password value", r"password:\s*(\S+)", 0.4, capture_group=1)
+    ]
+    recognizer_with_context = PatternRecognizer(
+        supported_entity="PASSWORD", patterns=patterns, context=["password"]
+    )
+    recognizer_without_context = PatternRecognizer(
+        supported_entity="PASSWORD", patterns=patterns
+    )
+    nlp_artifacts = spacy_nlp_engine.process_text(text, "en")
+
+    results_with_context = lemma_context.enhance_using_context(
+        text,
+        recognizer_with_context.analyze(text, ["PASSWORD"], nlp_artifacts),
+        nlp_artifacts,
+        [recognizer_with_context],
+    )
+    results_without_context = lemma_context.enhance_using_context(
+        text,
+        recognizer_without_context.analyze(text, ["PASSWORD"], nlp_artifacts),
+        nlp_artifacts,
+        [recognizer_without_context],
+    )
+
+    assert [(result.start, result.end) for result in results_with_context] == [
+        (13, 20)
+    ]
+    assert results_without_context[0].score == 0.4
+    assert results_with_context[0].score == pytest.approx(0.75)
+    assert (
+        results_with_context[0].analysis_explanation.supportive_context_word
+        == "password"
+    )
