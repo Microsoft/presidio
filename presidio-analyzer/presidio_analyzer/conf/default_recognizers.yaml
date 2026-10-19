@@ -647,3 +647,17 @@ recognizers:
     type: predefined
     enabled: false
     country_code: ca
+
+  - name: BrCpfRecognizer
+    supported_languages:
+      - pt
+    type: predefined
+    enabled: false
+    country_code: br
+
+  - name: BrCnpjRecognizer
+    supported_languages:
+      - pt
+    type: predefined
+    enabled: false
+    country_code: br

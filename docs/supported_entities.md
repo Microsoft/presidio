@@ -207,6 +207,13 @@ Detected using the `MedicalNERRecognizer` (requires the `transformers` extra). U
 |MEDICAL_FAMILY_HISTORY | A family medical history reference. | NER model (HuggingFace transformers) |
 |MEDICAL_HISTORY | A patient medical history reference. | NER model (HuggingFace transformers) |
 
+### Brazil
+
+| FieldType | Description | Detection Method |
+|---|---|---|
+| BR_CPF | The Brazilian individual taxpayer registration number (Cadastro de Pessoas Físicas). 11 digits with 2 modulo-11 check digits. | Pattern match, context and checksum |
+| BR_CNPJ | The Brazilian company registration number (Cadastro Nacional da Pessoa Jurídica), numeric and the alphanumeric format issued since July 2026. 14 characters with 2 modulo-11 check digits. | Pattern match, context and checksum |
+
 ## Adding a custom PII entity
 
 See [this documentation](analyzer/adding_recognizers.md) for instructions on how to add a new Recognizer for a new type of PII entity.
