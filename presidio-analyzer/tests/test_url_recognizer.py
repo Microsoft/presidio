@@ -32,6 +32,15 @@ def entities():
         ("https://www.microsoft.com/store/abc/", 1, ((0, 36),), 0.6,),
         ("microsoft.com", 1, ((0, 13),), 0.5,),
         ("my domains: microsoft.com google.co.il", 2, ((12, 25), (26, 38),), 0.5),
+        # URLs with a port: the port and the path after it are part of the URL
+        ("https://intranet.example.com:8080/patients/12345/records", 1, ((0, 56),), 0.6,),
+        ("http://api.example.org:3000/users?id=42", 1, ((0, 39),), 0.6,),
+        ("https://example.com:443", 1, ((0, 23),), 0.6,),
+        ("intranet.example.com:8080/records", 1, ((0, 33),), 0.5,),
+        ("https://example.de:8443/über/straße?q=ä", 1, ((0, 39),), 0.6,),
+        # A colon without digits, or more than 5 digits, is not a port
+        ("example.com: closed", 1, ((0, 11),), 0.5,),
+        ("example.com:123456/x", 1, ((0, 11),), 0.5,),
         ('"https://presidio.dataprivacystack.org/"', 1, ((0, 40),), 0.6),
         ("'https://presidio.dataprivacystack.org/'", 1, ((0, 40),), 0.6),
 
