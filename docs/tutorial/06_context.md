@@ -96,6 +96,14 @@ print(results)
 
 The confidence score is now 0.46 because it got enhanced from 0.01 with 0.45 and is more than the minimum of 0.4.
 
+Some lemmatizers split words into morphemes. For example, the Korean spaCy models can lemmatize `연락처가` as `연+락처+가` (the split depends on the surrounding text), so the context word `연락처` is not found. For such languages, pass their ISO 639-1 codes in `token_text_languages` to compare context words with the token text instead of the lemma:
+
+```python
+from presidio_analyzer.context_aware_enhancers import LemmaContextAwareEnhancer
+
+context_aware_enhancer = LemmaContextAwareEnhancer(token_text_languages=["ko"])
+```
+
 In addition to surrounding words, additional context words could be passed on the request level.
 This is useful when there is context coming from metadata such as column names or a specific user input.
 In the following example, notice how the "zip" context word doesn't appear in the text but still enhances the confidence score from 0.01 to 0.4:

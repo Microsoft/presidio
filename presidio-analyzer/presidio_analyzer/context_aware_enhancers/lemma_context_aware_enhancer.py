@@ -30,6 +30,12 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         - "whole_word": Match context words only as whole words
           (e.g., 'lic' matches 'lic' but not 'duplicate').
           Prevents false positives.
+    :param token_text_languages: ISO 639-1 codes of languages for which context
+        words are compared with the token text instead of the lemma.
+        Useful where the lemmatizer splits words into morphemes: the Korean
+        spaCy models can lemmatize "연락처가" as "연+락처+가" (the split
+        depends on the surrounding text), so "연락처" is not found.
+        Defaults to None (always compare with lemmas).
     """
 
     def __init__(
@@ -39,6 +45,7 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         context_prefix_count: int = 5,
         context_suffix_count: int = 0,
         context_matching_mode: str = "substring",
+        token_text_languages: Optional[List[str]] = None,
     ):
         super().__init__(
             context_similarity_factor=context_similarity_factor,
@@ -52,6 +59,7 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                 f"Got: {context_matching_mode}"
             )
         self.context_matching_mode = context_matching_mode
+        self.token_text_languages = token_text_languages or []
 
     def enhance_using_context(
         self,
@@ -96,6 +104,8 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         if nlp_artifacts is None:
             logger.warning("NLP artifacts were not provided")
             return results
+
+        nlp_artifacts = self._use_token_text_if_configured(nlp_artifacts)
 
         for result in results:
             recognizer = None
@@ -159,6 +169,29 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                 )
                 result.analysis_explanation.set_improved_score(result.score)
         return results
+
+    def _use_token_text_if_configured(
+        self, nlp_artifacts: NlpArtifacts
+    ) -> NlpArtifacts:
+        """Swap the lemmas for the token text if the document language is listed.
+
+        Returns a shallow copy, so the caller's artifacts are not modified.
+
+        :param nlp_artifacts: The nlp artifacts of the analyzed text
+        """
+        tokens = nlp_artifacts.tokens
+        language = getattr(tokens, "lang_", None)
+        if not tokens or language not in self.token_text_languages:
+            return nlp_artifacts
+
+        nlp_artifacts = copy.copy(nlp_artifacts)
+        nlp_artifacts.lemmas = [token.text for token in tokens]
+        nlp_artifacts.keywords = [
+            token.text.lower()
+            for token in tokens
+            if not (token.is_stop or token.is_punct)
+        ]
+        return nlp_artifacts
 
     @staticmethod
     def _find_supportive_word_in_context(

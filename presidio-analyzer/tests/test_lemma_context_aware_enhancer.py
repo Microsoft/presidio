@@ -1,4 +1,7 @@
-from presidio_analyzer import LemmaContextAwareEnhancer
+import pytest
+import spacy
+from presidio_analyzer import LemmaContextAwareEnhancer, Pattern, PatternRecognizer
+from presidio_analyzer.nlp_engine import NlpArtifacts
 
 
 def test_when_index_finding_then_succeed():
@@ -280,3 +283,101 @@ def test_when_substring_mode_then_compound_words_work_in_integration(spacy_nlp_e
     assert (
         enhanced_results[0].analysis_explanation.supportive_context_word == "passport"
     )
+
+
+def _korean_nlp_artifacts():
+    """Build NLP artifacts for a Korean sentence as ko_core_news_sm produces them.
+
+    The Korean spaCy lemmatizer joins morphemes with "+" and can split a word
+    inside a context term: ko_core_news_sm 3.8.0 lemmatizes "외국인등록번호는"
+    as "외국인등록번+호는", which no longer contains "외국인등록번호".
+    """
+    nlp = spacy.blank(
+        "ko", config={"nlp": {"tokenizer": {"@tokenizers": "spacy.Tokenizer.v1"}}}
+    )
+    doc = nlp("외국인등록번호는 900101-5234567")
+    nlp_artifacts = NlpArtifacts(
+        entities=[],
+        tokens=doc,
+        tokens_indices=[token.idx for token in doc],
+        lemmas=["외국인등록번+호는", "900101", "-", "5234567"],
+        nlp_engine=None,
+        language="ko",
+    )
+    nlp_artifacts.keywords = ["외국인등록번+호는", "900101", "5234567"]
+    return nlp_artifacts
+
+
+def _korean_recognizer():
+    return PatternRecognizer(
+        supported_entity="KR_FRN",
+        supported_language="ko",
+        patterns=[Pattern("frn", r"\d{6}-\d{7}", 0.5)],
+        context=["외국인등록번호"],
+    )
+
+
+def test_when_lemma_splits_korean_context_word_then_token_text_finds_it():
+    """Test that token text finds a context word the Korean lemma splits."""
+    nlp_artifacts = _korean_nlp_artifacts()
+    recognizer = _korean_recognizer()
+    text = nlp_artifacts.tokens.text
+    raw_results = recognizer.analyze(text, ["KR_FRN"], nlp_artifacts)
+
+    default = LemmaContextAwareEnhancer().enhance_using_context(
+        text, raw_results, nlp_artifacts, [recognizer]
+    )
+    token_text = LemmaContextAwareEnhancer(
+        token_text_languages=["ko"]
+    ).enhance_using_context(text, raw_results, nlp_artifacts, [recognizer])
+
+    assert default[0].score == 0.5
+    assert token_text[0].score == pytest.approx(0.85)
+    explanation = token_text[0].analysis_explanation
+    assert explanation.supportive_context_word == "외국인등록번호"
+
+
+def test_when_language_not_in_token_text_languages_then_lemmas_are_used():
+    """Test that languages not listed in token_text_languages keep using lemmas."""
+    doc = spacy.blank("en")("credit cards 4111111111111111")
+    lemmas = ["credit", "card", "4111111111111111"]
+    nlp_artifacts = NlpArtifacts(
+        entities=[],
+        tokens=doc,
+        tokens_indices=[token.idx for token in doc],
+        lemmas=lemmas,
+        nlp_engine=None,
+        language="en",
+    )
+    nlp_artifacts.keywords = lemmas
+    recognizer = PatternRecognizer(
+        supported_entity="CARD",
+        patterns=[Pattern("card", r"\d{16}", 0.5)],
+        context=["card"],
+    )
+    raw_results = recognizer.analyze(doc.text, ["CARD"], nlp_artifacts)
+
+    enhancer = LemmaContextAwareEnhancer(
+        context_matching_mode="whole_word", token_text_languages=["ko"]
+    )
+    results = enhancer.enhance_using_context(
+        doc.text, raw_results, nlp_artifacts, [recognizer]
+    )
+
+    # "card" matches the lemma of "cards", which only the lemma path can see
+    assert results[0].score == pytest.approx(0.85)
+
+
+def test_when_token_text_is_used_then_nlp_artifacts_are_not_modified():
+    """Test that the token-text swap leaves the caller's NLP artifacts unchanged."""
+    nlp_artifacts = _korean_nlp_artifacts()
+    recognizer = _korean_recognizer()
+    text = nlp_artifacts.tokens.text
+    raw_results = recognizer.analyze(text, ["KR_FRN"], nlp_artifacts)
+
+    LemmaContextAwareEnhancer(token_text_languages=["ko"]).enhance_using_context(
+        text, raw_results, nlp_artifacts, [recognizer]
+    )
+
+    assert nlp_artifacts.lemmas == ["외국인등록번+호는", "900101", "-", "5234567"]
+    assert nlp_artifacts.keywords == ["외국인등록번+호는", "900101", "5234567"]
