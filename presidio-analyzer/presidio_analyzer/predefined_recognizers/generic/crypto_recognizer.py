@@ -66,10 +66,11 @@ class CryptoRecognizer(PatternRecognizer):
                 return bcbytes[-4:] == checksum
             except ValueError:
                 return False
-        elif pattern_text.startswith("bc1"):
+        elif pattern_text.lower().startswith("bc1"):
             # Bech32 or Bech32m address validation
-            if CryptoRecognizer.validate_bech32_address(pattern_text)[0]:
-                return True
+            return (
+                CryptoRecognizer.decode_segwit_address("bc", pattern_text) is not None
+            )
         return False
 
     @staticmethod
@@ -131,6 +132,42 @@ class CryptoRecognizer(PatternRecognizer):
         if spec is None:
             return (None, None, None)
         return (hrp, data[:-6], spec)
+
+    @staticmethod
+    def convertbits(data, frombits, tobits):
+        """Regroup bits without padding, as required for witness programs."""
+        acc = 0
+        bits = 0
+        ret = []
+        maxv = (1 << tobits) - 1
+        max_acc = (1 << (frombits + tobits - 1)) - 1
+        for value in data:
+            acc = ((acc << frombits) | value) & max_acc
+            bits += frombits
+            while bits >= tobits:
+                bits -= tobits
+                ret.append((acc >> bits) & maxv)
+        if bits >= frombits or ((acc << (tobits - bits)) & maxv):
+            return None
+        return ret
+
+    @staticmethod
+    def decode_segwit_address(hrp, address):
+        """Decode a segwit address, enforcing the BIP173 and BIP350 rules."""
+        hrpgot, data, spec = CryptoRecognizer.bech32_decode(address)
+        if hrpgot != hrp:
+            return None
+        program = CryptoRecognizer.convertbits(data[1:], 5, 8)
+        if program is None or len(program) < 2 or len(program) > 40:
+            return None
+        version = data[0]
+        if version > 16:
+            return None
+        if version == 0 and len(program) not in (20, 32):
+            return None
+        if spec != (BECH32 if version == 0 else BECH32M):
+            return None
+        return version, program
 
     @staticmethod
     def validate_bech32_address(address):
