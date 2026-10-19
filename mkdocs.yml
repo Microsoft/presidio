@@ -101,6 +101,7 @@ nav:
       - Using Span Marker as an external PII model: https://github.com/data-privacy-stack/presidio/blob/main/docs/samples/python/span_marker_recognizer.py
       - Using Transformers as an external PII model: samples/python/transformers_recognizer/index.md
       - Using GLiNER as an external PII model: samples/python/gliner.md
+      - Recognizing answers to prompts in call and chat transcripts: samples/python/conversational_prompt_recognizer/index.md
       - Pseudonymization (replace PII values using mappings): samples/python/pseudonymization.ipynb
       - Passing a lambda as a Presidio anonymizer using Faker: https://github.com/data-privacy-stack/presidio/blob/main/docs/samples/python/example_custom_lambda_anonymizer.py
       - Synthetic data generation with OpenAI: samples/python/synth_data_with_openai.ipynb
@@ -137,6 +138,8 @@ not_in_nav : |
   samples/deployments/spark/notebooks/00_setup.py
   samples/deployments/spark/notebooks/01_transform_presidio.py
   samples/docker/index.md
+  samples/python/conversational_prompt_recognizer/conversational_prompt_recognizer.py
+  samples/python/conversational_prompt_recognizer/test_conversational_prompt_recognizer.py
   samples/python/custom_presidio.py
   samples/python/simple_anonymization_example.py
   samples/python/streamlit/azure_ai_language_wrapper.py
