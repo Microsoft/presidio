@@ -15,26 +15,26 @@ class DePassportRecognizer(PatternRecognizer):
     Data protection: DSGVO Art. 4 Nr. 1 (personenbezogene Daten), BDSG.
 
     Format (9 characters total):
-        - 8 alphanumeric characters (uppercase letters from the limited set
-          C, F, G, H, J, K, L, M, N, P, R, T, V, W, X, Y, Z and digits 0–9)
-          followed by
-        - 1 digit at position 9 — the ICAO Doc 9303 check digit over the
-          first 8 characters.
-        - Example: C01X00T41 (F20400481 verifies against ICAO)
+        - Uppercase letters from the limited set C, F, G, H, J, K, L, M, N,
+          P, R, T, V, W, X, Y, Z and digits 0–9, as printed on the data page.
+        - Example: C01X00T47 (specimen passport)
+        - The ICAO Doc 9303 check digit is not part of the printed number:
+          it follows the number in the MRZ (C01X00T478D<<...), so a
+          10-character match is the number plus its check digit.
 
     Character set excludes visually ambiguous letters (A, B, D, E, I, O, Q,
     S, U) per ICAO Doc 9303 Machine Readable Travel Documents.
 
     Check digit algorithm (ICAO Doc 9303):
         - Letters A=10, B=11, …, Z=35; digits keep their face value.
-        - Apply weights 7, 3, 1 repeating to the first 8 characters.
-        - Sum the products, take sum mod 10 — that is the 9th digit.
+        - Apply weights 7, 3, 1 repeating to the 9 characters of the number.
+        - Sum the products, take sum mod 10 — that is the check digit.
 
-    Worked example for C01X00T41:
-        values = 12, 0, 1, 33, 0, 0, 29, 4
-        weights = 7, 3, 1, 7, 3, 1, 7, 3
-        products = 84, 0, 1, 231, 0, 0, 203, 12 → sum = 531
-        531 mod 10 = 1 → matches check digit '1'
+    Worked example for C01X00T47:
+        values = 12, 0, 1, 33, 0, 0, 29, 4, 7
+        weights = 7, 3, 1, 7, 3, 1, 7, 3, 1
+        products = 84, 0, 1, 231, 0, 0, 203, 12, 7 → sum = 538
+        538 mod 10 = 8 → the MRZ reads C01X00T478
 
     :param patterns: List of patterns to be used by this recognizer
     :param context: List of context words to increase confidence in detection
@@ -54,7 +54,7 @@ class DePassportRecognizer(PatternRecognizer):
     PATTERNS = [
         Pattern(
             "Reisepassnummer (Strict ICAO charset)",
-            r"\b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{7}[0-9]\b",
+            r"\b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{7}[0-9]\d?(?:\b|(?=D<))",
             0.4,
         ),
     ]
@@ -93,26 +93,32 @@ class DePassportRecognizer(PatternRecognizer):
 
     def validate_result(self, pattern_text: str) -> Optional[bool]:
         """
-        Validate the ICAO Doc 9303 check digit at position 9.
+        Validate the ICAO Doc 9303 check digit when it is present.
 
         Algorithm source: ICAO Doc 9303 Part 3 — Machine Readable Travel
-        Documents. Weights 7, 3, 1 repeating applied to positions 1–8 with
-        letters mapped A=10 … Z=35; the sum modulo 10 must equal the digit
-        at position 9.
+        Documents. The printed 9-character number carries no check digit and
+        is kept at pattern confidence (return ``None``). A 10-character match
+        is the number followed by its MRZ check digit: weights 7, 3, 1
+        repeating over the 9 characters, letters mapped A=10 … Z=35, sum
+        modulo 10.
 
-        :param pattern_text: the text to validate (9 characters)
-        :return: True if check digit is valid, False otherwise
+        :param pattern_text: the text to validate (9 or 10 characters)
+        :return: True if the check digit is valid; False if it is not or the
+                 value is malformed; None when there is no check digit.
         """
         pattern_text = pattern_text.upper().strip()
-
-        if len(pattern_text) != 9 or not pattern_text[-1].isdigit():
-            return False
 
         # ICAO Doc 9303 excludes these visually-ambiguous letters from
         # travel-document serial numbers. Reject outright so the weighted
         # checksum cannot accidentally mark a non-ICAO string as valid.
         forbidden = set("ABDEIOQSU")
-        if any(c in forbidden for c in pattern_text[:-1]):
+        if any(c in forbidden for c in pattern_text[:9]):
+            return False
+
+        if len(pattern_text) == 9:
+            return None
+
+        if len(pattern_text) != 10 or not pattern_text[-1].isdigit():
             return False
 
         weights = [7, 3, 1]

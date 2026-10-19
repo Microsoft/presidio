@@ -15,10 +15,12 @@ class DeIdCardRecognizer(PatternRecognizer):
     Data protection: DSGVO Art. 4 Nr. 1 (personenbezogene Daten), BDSG.
 
     Format (nPA, since November 2010):
-        - 9 characters: first 8 from the ICAO restricted uppercase charset
-          (excludes A, B, D, E, I, O, Q, S, U) plus 1 digit at position 9
-          (the ICAO Doc 9303 check digit).
-        - Example: L01X00T44 (verifies against ICAO)
+        - 9 characters from the ICAO restricted uppercase charset
+          (excludes A, B, D, E, I, O, Q, S, U), as printed on the card.
+        - Example: L01X00T47 (specimen card)
+        - The ICAO Doc 9303 check digit is not part of the printed number:
+          it follows the number in the MRZ (IDD<<L01X00T471...), so a
+          10-character match is the number plus its check digit.
 
     Format (old Personalausweis, before November 2010):
         - Letter T followed by 8 digits (legacy 9-char format; no ICAO
@@ -26,8 +28,8 @@ class DeIdCardRecognizer(PatternRecognizer):
         - Example: T22000124
 
     Check digit algorithm (ICAO Doc 9303, nPA only):
-        Weights 7, 3, 1 repeating on positions 1–8 with letters mapped
-        A=10 … Z=35; the sum modulo 10 must equal the digit at position 9.
+        Weights 7, 3, 1 repeating on the 9 characters of the number with
+        letters mapped A=10 … Z=35; the sum modulo 10 is the check digit.
 
     :param patterns: List of patterns to be used by this recognizer
     :param context: List of context words to increase confidence in detection
@@ -39,8 +41,8 @@ class DeIdCardRecognizer(PatternRecognizer):
 
     PATTERNS = [
         Pattern(
-            "Personalausweisnummer nPA (ICAO charset + check digit)",
-            r"\b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{7}[0-9]\b",
+            "Personalausweisnummer nPA (ICAO charset, optional MRZ check digit)",
+            r"\b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{7}[0-9]\d?\b",
             0.4,
         ),
         Pattern(
@@ -87,26 +89,23 @@ class DeIdCardRecognizer(PatternRecognizer):
 
     def validate_result(self, pattern_text: str) -> Optional[bool]:
         """
-        Validate the nPA ICAO Doc 9303 check digit.
+        Validate the nPA ICAO Doc 9303 check digit when it is present.
 
-        Legacy "T + 8 digits" numbers (pre-2010) are accepted at pattern
-        confidence (return ``None``) because they predate ICAO and do not
-        carry a check digit.
+        The printed 9-character number carries no check digit, so it (like
+        the legacy "T + 8 digits" format) is kept at pattern confidence
+        (return ``None``). A 10-character match is the number followed by
+        its MRZ check digit, which is verified.
 
-        :param pattern_text: the text to validate (9 characters)
-        :return: True if the ICAO check matches; False if the nPA-shaped
-                 value fails the check; None for the legacy T-format which
-                 cannot be structurally validated here.
+        :param pattern_text: the text to validate (9 or 10 characters)
+        :return: True if the ICAO check matches; False if it does not or the
+                 value is malformed; None when there is no check digit.
         """
         pattern_text = pattern_text.upper().strip()
 
-        if len(pattern_text) != 9:
-            return False
-
-        if pattern_text[0] == "T" and pattern_text[1:].isdigit():
+        if len(pattern_text) == 9:
             return None
 
-        if not pattern_text[-1].isdigit():
+        if len(pattern_text) != 10 or not pattern_text[-1].isdigit():
             return False
 
         weights = [7, 3, 1]
