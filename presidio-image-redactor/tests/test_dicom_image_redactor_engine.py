@@ -136,7 +136,7 @@ def test_check_if_greyscale_happy_path(mock_engine: DicomImageRedactorEngine, dc
         (Path(TEST_DICOM_DIR_3, "3_ORIGINAL.DICOM"), True),
     ],
 )
-def test_check_if_greyscale_happy_path(mock_engine: DicomImageRedactorEngine, dcm_file: Path, is_greyscale: bool):
+def test_rescale_dcm_pixel_array_happy_path(mock_engine: DicomImageRedactorEngine, dcm_file: Path, is_greyscale: bool):
     """Test happy path for DicomImageRedactorEngine._rescale_dcm_pixel_array
 
     Args:
