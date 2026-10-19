@@ -9,11 +9,13 @@ class ZaIncomeTaxNumberRecognizer(PatternRecognizer):
 
     Income tax reference numbers are 10-digit numeric identifiers issued
     by SARS. They commonly start with ``0``, ``1``, ``2``, ``3``, or ``9``.
-    VAT numbers also have 10 digits but start with ``4`` — use
+    The last digit is a check digit calculated with the Luhn (modulus 10)
+    algorithm. VAT numbers also have 10 digits but start with ``4`` — use
     ``ZA_VAT_NUMBER`` for those instead.
 
     Reference:
     https://www.taxtim.com/za/tax-guides/get-a-tax-number
+    https://www.oecd.org/tax/automatic-exchange/crs-implementation-and-assistance/tax-identification-numbers/South-Africa-TIN.pdf
 
     :param patterns: List of patterns to be used by this recognizer
     :param context: List of context words to increase confidence in detection
@@ -67,4 +69,20 @@ class ZaIncomeTaxNumberRecognizer(PatternRecognizer):
             len(pattern_text) == self.TAX_NUMBER_LENGTH
             and pattern_text.isdigit()
             and pattern_text[0] in self.ALLOWED_LEADING_DIGITS
+            and self._is_luhn_valid(pattern_text)
         )
+
+    @staticmethod
+    def _is_luhn_valid(value: str) -> bool:
+        digits = [int(digit) for digit in value]
+        checksum = 0
+        parity = len(digits) % 2
+
+        for index, digit in enumerate(digits):
+            if index % 2 == parity:
+                digit *= 2
+                if digit > 9:
+                    digit -= 9
+            checksum += digit
+
+        return checksum % 10 == 0
