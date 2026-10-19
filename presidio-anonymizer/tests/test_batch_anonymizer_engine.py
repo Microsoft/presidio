@@ -1,10 +1,9 @@
 import pytest
-
 from presidio_anonymizer import BatchAnonymizerEngine
 from presidio_anonymizer.entities import (
-    RecognizerResult,
     DictRecognizerResult,
     OperatorConfig,
+    RecognizerResult,
 )
 
 
@@ -134,3 +133,72 @@ def test_given_custom_anonymizer_we_anonymize_dict_correctly(engine, analyzer_re
     assert anonymize_results == {
         "name": ["<ENTITY: John>", "<ENTITY: Jill>", "<ENTITY: Jack>"]
     }
+
+
+@pytest.mark.parametrize(
+    "texts, recognizer_results_list",
+    [
+        (["John", "Jill", "Jack"], [[], []]),
+        (["John", "Jill"], [[], [], []]),
+        ([], [[]]),
+    ],
+)
+def test_anonymize_list_rejects_mismatched_lengths(
+    engine, texts, recognizer_results_list
+):
+    """Reject batch inputs with mismatched result-list lengths."""
+    with pytest.raises(
+        ValueError,
+        match="The number of recognizer-result lists must match",
+    ):
+        engine.anonymize_list(
+            texts=texts,
+            recognizer_results_list=recognizer_results_list,
+        )
+
+
+def test_anonymize_list_preserves_empty_detection_fallback(engine):
+    """Preserve the existing empty-detection fallback."""
+    texts = ["John", "Jill", "Jack"]
+
+    result = engine.anonymize_list(
+        texts=texts,
+        recognizer_results_list=[],
+    )
+
+    assert result == texts
+    assert len(result) == len(texts)
+
+
+def test_anonymize_list_with_matching_lengths(engine):
+    """Anonymize every record when input lengths match."""
+    texts = ["John", "Jill", "Jack"]
+    recognizer_results_list = [
+        [RecognizerResult("PERSON", 0, 4, 0.85)],
+        [RecognizerResult("PERSON", 0, 4, 0.85)],
+        [RecognizerResult("PERSON", 0, 4, 0.85)],
+    ]
+
+    result = engine.anonymize_list(
+        texts=texts,
+        recognizer_results_list=recognizer_results_list,
+    )
+
+    assert result == ["<PERSON>", "<PERSON>", "<PERSON>"]
+
+
+def test_anonymize_dict_rejects_nested_list_length_mismatch(engine):
+    """Propagate batch length validation through dictionary anonymization."""
+    analyzer_results = [
+        DictRecognizerResult(
+            key="names",
+            value=["John", "Jill", "Jack"],
+            recognizer_results=[[], []],
+        )
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match="The number of recognizer-result lists must match",
+    ):
+        engine.anonymize_dict(analyzer_results)
