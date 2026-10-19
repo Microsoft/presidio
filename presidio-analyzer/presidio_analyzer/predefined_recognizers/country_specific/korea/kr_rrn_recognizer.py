@@ -43,6 +43,12 @@ class KrRrnRecognizer(PatternRecognizer):
     ]
 
     CONTEXT = [
+        "주민등록번호",
+        "주민번호",
+        "주민등록증",
+        "주민등록",
+        "신분증",
+        "본인인증",
         "Korean RRN",
         "Korean Resident Registration Number",
         "Resident Registration Number",
