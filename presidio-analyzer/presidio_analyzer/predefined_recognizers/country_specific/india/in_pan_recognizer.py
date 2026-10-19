@@ -38,7 +38,7 @@ class InPanRecognizer(PatternRecognizer):
         ),
         Pattern(
             "PAN (Low)",
-            r"\b((?=.*?[a-zA-Z])(?=.*?[0-9]{4})[\w@#$%^?~-]{10})\b",
+            r"\b((?=[\w@#$%^?~-]*?[a-zA-Z])(?=[\w@#$%^?~-]*?[0-9]{4})[\w@#$%^?~-]{10})\b",
             0.01,
         ),
     ]

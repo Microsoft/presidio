@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from tests import assert_result
@@ -47,3 +49,25 @@ def test_when_pan_in_text_then_all_pans_found(
             expected_position[1],
             expected_score,
         )
+
+
+def test_low_confidence_pan_with_embedded_digits_still_detected(recognizer, entities):
+    # The low-confidence pattern keeps matching a 10-char token that carries a
+    # letter and a four-digit run; scoping the lookaheads to the token class
+    # leaves this detection unchanged.
+    results = recognizer.analyze("A1111DFSFS", entities)
+    assert len(results) == 1
+    assert_result(results[0], entities[0], 0, 10, 0.01)
+
+
+def test_low_confidence_pattern_does_not_backtrack(recognizer, entities):
+    # The low-confidence pattern used `.*?` lookaheads that rescanned the whole
+    # remaining text at every word boundary, so a long boundary-rich string with
+    # no four-digit run cost time quadratic in its length. Matching must now be
+    # linear and finish well within the regex timeout.
+    text = "a " * 50000
+    start = time.perf_counter()
+    results = recognizer.analyze(text, entities)
+    elapsed = time.perf_counter() - start
+    assert results == []
+    assert elapsed < 10
