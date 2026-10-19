@@ -248,6 +248,79 @@ def test_get_pii_bboxes_happy_path(
     assert test_pii_bboxes == expected_output
 
 
+def test_get_pii_bboxes_keeps_first_match_on_duplicate_positions(
+    image_analyzer_engine: ImageAnalyzerEngine,
+):
+    """Test that the first analyzer bbox at a given position wins on duplicates."""
+    # Assign
+    ocr_bboxes = [{"left": 50, "top": 0, "width": 30, "height": 10}]
+    analyzer_bboxes = [
+        {"left": 50, "top": 0, "width": 30, "height": 10, "entity_type": "FIRST"},
+        {"left": 50, "top": 0, "width": 30, "height": 10, "entity_type": "SECOND"},
+    ]
+
+    # Act
+    test_pii_bboxes = image_analyzer_engine.get_pii_bboxes(ocr_bboxes, analyzer_bboxes)
+
+    # Assert
+    assert test_pii_bboxes == [
+        {
+            "left": 50,
+            "top": 0,
+            "width": 30,
+            "height": 10,
+            "entity_type": "FIRST",
+            "is_PII": True,
+        }
+    ]
+
+
+def _get_pii_bboxes_naive(ocr_bboxes, analyzer_bboxes):
+    """Compute the O(n*m) reference result to check equivalence against."""
+    bboxes = []
+    for ocr_bbox in ocr_bboxes:
+        has_match = False
+        for analyzer_bbox in analyzer_bboxes:
+            is_same = (
+                ocr_bbox["left"] == analyzer_bbox["left"]
+                and ocr_bbox["top"] == analyzer_bbox["top"]
+                and ocr_bbox["width"] == analyzer_bbox["width"]
+                and ocr_bbox["height"] == analyzer_bbox["height"]
+            )
+            if is_same:
+                current_bbox = dict(analyzer_bbox)
+                current_bbox["is_PII"] = True
+                has_match = True
+                break
+        if not has_match:
+            current_bbox = dict(ocr_bbox)
+            current_bbox["is_PII"] = False
+        bboxes.append(current_bbox)
+    return bboxes
+
+
+def test_get_pii_bboxes_matches_naive_implementation_at_scale(
+    image_analyzer_engine: ImageAnalyzerEngine,
+):
+    """Test that the indexed lookup matches the naive O(n*m) scan at scale."""
+    # Assign: build a large set of ocr bboxes, half of which overlap
+    # positionally with analyzer bboxes.
+    ocr_bboxes = [
+        {"left": i, "top": i, "width": 10, "height": 10} for i in range(500)
+    ]
+    analyzer_bboxes = [
+        {"left": i, "top": i, "width": 10, "height": 10, "entity_type": "PERSON"}
+        for i in range(0, 500, 2)
+    ]
+
+    # Act
+    expected = _get_pii_bboxes_naive(ocr_bboxes, analyzer_bboxes)
+    actual = image_analyzer_engine.get_pii_bboxes(ocr_bboxes, analyzer_bboxes)
+
+    # Assert
+    assert actual == expected
+
+
 @pytest.mark.parametrize(
     "bboxes, show_text_annotation, use_greyscale_cmap",
     [

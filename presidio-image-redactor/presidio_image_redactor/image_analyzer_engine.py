@@ -336,29 +336,35 @@ class ImageAnalyzerEngine:
 
         :return: All bboxes with appropriate label for whether it is PHI or not.
         """
+        # Index analyzer bboxes by position/dimension once, instead of
+        # rescanning the full analyzer_bboxes list for every ocr_bbox
+        # (this turns an O(ocr_bboxes x analyzer_bboxes) scan into O(n + m)).
+        analyzer_bbox_by_position = {}
+        for analyzer_bbox in analyzer_bboxes:
+            key = (
+                analyzer_bbox["left"],
+                analyzer_bbox["top"],
+                analyzer_bbox["width"],
+                analyzer_bbox["height"],
+            )
+            # Keep the first match for a given position, matching the
+            # original loop's break-on-first-match behavior.
+            analyzer_bbox_by_position.setdefault(key, analyzer_bbox)
+
         bboxes = []
         for ocr_bbox in ocr_bboxes:
-            has_match = False
+            key = (
+                ocr_bbox["left"],
+                ocr_bbox["top"],
+                ocr_bbox["width"],
+                ocr_bbox["height"],
+            )
+            matched_bbox = analyzer_bbox_by_position.get(key)
 
-            # Check if we have the same bbox in analyzer results
-            for analyzer_bbox in analyzer_bboxes:
-                has_same_position = (
-                    ocr_bbox["left"] == analyzer_bbox["left"]
-                    and ocr_bbox["top"] == analyzer_bbox["top"]
-                )
-                has_same_dimension = (
-                    ocr_bbox["width"] == analyzer_bbox["width"]
-                    and ocr_bbox["height"] == analyzer_bbox["height"]
-                )
-                is_same = has_same_position is True and has_same_dimension is True
-
-                if is_same is True:
-                    current_bbox = analyzer_bbox
-                    current_bbox["is_PII"] = True
-                    has_match = True
-                    break
-
-            if has_match is False:
+            if matched_bbox is not None:
+                current_bbox = matched_bbox
+                current_bbox["is_PII"] = True
+            else:
                 current_bbox = ocr_bbox
                 current_bbox["is_PII"] = False
 
