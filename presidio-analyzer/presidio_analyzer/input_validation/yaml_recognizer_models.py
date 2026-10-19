@@ -195,6 +195,47 @@ class TextChunkerConfig(BaseModel):
         return self
 
 
+class ContextAwareEnhancerConfig(BaseModel):
+    """Validated configuration for the analyzer's context-aware enhancer.
+
+    Omitted fields keep the ``LemmaContextAwareEnhancer`` constructor defaults.
+
+    :param context_similarity_factor: How much to enhance confidence of a match.
+    :param min_score_with_context_similarity: Minimum confidence score
+    when context is found.
+    :param context_prefix_count: How many words before the entity to match context.
+    :param context_suffix_count: How many words after the entity to match context.
+    :param context_matching_mode: "substring" or "whole_word".
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    context_similarity_factor: Optional[float] = Field(
+        None, ge=0, le=1, description="How much to enhance confidence of a match"
+    )
+    min_score_with_context_similarity: Optional[float] = Field(
+        None, ge=0, le=1, description="Minimum confidence score with context"
+    )
+    context_prefix_count: Optional[int] = Field(
+        None, ge=0, description="Words before the entity to match context"
+    )
+    context_suffix_count: Optional[int] = Field(
+        None, ge=0, description="Words after the entity to match context"
+    )
+    context_matching_mode: Optional[Literal["substring", "whole_word"]] = Field(
+        None, description="Matching mode for context words"
+    )
+
+    def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
+        """Serialize the config without None values by default.
+
+        The dump is passed directly to the enhancer constructor. Excluding None
+        values preserves constructor defaults for omitted YAML fields.
+        """
+        kwargs.setdefault("exclude_none", True)
+        return super().model_dump(*args, **kwargs)
+
+
 class PredefinedRecognizerConfig(BaseRecognizerConfig):
     """Configuration for predefined recognizers."""
 

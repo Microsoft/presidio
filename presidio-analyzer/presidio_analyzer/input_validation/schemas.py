@@ -9,7 +9,7 @@ from presidio_analyzer.score_thresholds import (
 )
 
 from . import validate_language_codes
-from .yaml_recognizer_models import RecognizerRegistryConfig
+from .yaml_recognizer_models import ContextAwareEnhancerConfig, RecognizerRegistryConfig
 
 
 class ConfigurationValidator:
@@ -110,6 +110,32 @@ class ConfigurationValidator:
         return dumped_config
 
     @staticmethod
+    def validate_context_aware_enhancer_configuration(
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Validate the context-aware enhancer section of the analyzer configuration.
+
+        :param config: Context-aware enhancer configuration to validate.
+        :return: The provided keys only, so omitted ones keep constructor defaults.
+        """
+        if not isinstance(config, dict):
+            raise ValueError(
+                "context_aware_enhancer configuration must be a dictionary"
+            )
+        try:
+            validated_config = ContextAwareEnhancerConfig(**config)
+        except ValidationError as e:
+            errors = "; ".join(
+                f"{'.'.join(str(loc) for loc in error['loc'])}: {error['msg']}"
+                for error in e.errors()
+            )
+            raise ValueError(
+                f"Invalid context_aware_enhancer configuration: {errors}. "
+                f"Valid keys are: {sorted(ContextAwareEnhancerConfig.model_fields)}"
+            ) from e
+        return validated_config.model_dump()
+
+    @staticmethod
     def validate_analyzer_configuration(config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate analyzer engine configuration."""
         if not isinstance(config, dict):
@@ -121,6 +147,7 @@ class ConfigurationValidator:
             "default_score_threshold",
             "nlp_configuration",
             "recognizer_registry",
+            "context_aware_enhancer",
         }
 
         # Check for unknown keys
@@ -151,6 +178,11 @@ class ConfigurationValidator:
         if "recognizer_registry" in config:
             ConfigurationValidator.validate_recognizer_registry_configuration(
                 config["recognizer_registry"]
+            )
+
+        if "context_aware_enhancer" in config:
+            ConfigurationValidator.validate_context_aware_enhancer_configuration(
+                config["context_aware_enhancer"]
             )
 
         return config
