@@ -1,7 +1,12 @@
-import pytest
+from pathlib import Path
 
+import pytest
+import yaml
+
+import presidio_analyzer
 from tests import assert_result_within_score_range
 from presidio_analyzer.predefined_recognizers import UsMbiRecognizer
+from presidio_analyzer.recognizer_registry import RecognizerRegistryProvider
 
 
 @pytest.fixture(scope="module")
@@ -50,6 +55,10 @@ def entities():
         ("1EG4-ZE5-MK73", 0, (), (),),
         # No match - letter in position 1 (should be number)
         ("AEG4-TE5-MK73", 0, (), (),),
+        # No match - 0 in position 1 (CMS: position 1 is numeric 1 thru 9)
+        ("0EG4-TE5-MK73", 0, (), (),),
+        ("0EG4TE5MK73", 0, (), (),),
+        ("Medicare ID: 0EG4-TE5-MK73", 0, (), (),),
         # No match - number in position 2 (should be letter)
         ("12G4-TE5-MK73", 0, (), (),),
         # No match - too short
@@ -99,3 +108,30 @@ def test_mbi_recognizer_context_words(recognizer):
         "medicare", "mbi", "beneficiary", "cms", "medicaid", "hic", "hicn"
     ]
     assert recognizer.context == expected_context
+
+
+def test_loads_from_default_recognizers_yaml_and_rejects_leading_zero():
+    """The shipped YAML entry loads and rejects a 0 in position 1."""
+    conf = Path(presidio_analyzer.__file__).parent / "conf" / "default_recognizers.yaml"
+    recognizers = yaml.safe_load(conf.read_text(encoding="utf-8"))["recognizers"]
+    entries = [r for r in recognizers if r.get("name") == "UsMbiRecognizer"]
+    assert len(entries) == 1, "UsMbiRecognizer missing from YAML"
+    entry = entries[0]
+    assert entry["country_code"] == "us"
+
+    registry = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [dict(entry, enabled=True)],
+        }
+    ).create_recognizer_registry()
+
+    assert [type(r).__name__ for r in registry.recognizers] == ["UsMbiRecognizer"]
+    recognizer = registry.recognizers[0]
+
+    text = "Old ID 0EG4-TE5-MK73, current MBI 1EG4-TE5-MK73"
+    results = recognizer.analyze(text, ["US_MBI"])
+
+    assert [(r.start, r.end) for r in results] == [(34, 47)]
+    assert results[0].entity_type == "US_MBI"
+    assert results[0].score == pytest.approx(0.5)
