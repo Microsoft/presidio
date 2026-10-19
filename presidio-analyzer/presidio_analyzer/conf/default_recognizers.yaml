@@ -625,6 +625,14 @@ recognizers:
     enabled: false
     country_code: de
 
+  # Austria recognizers (disabled by default, enable for German-language pipelines)
+  - name: AtSvnrRecognizer
+    supported_languages:
+    - de
+    type: predefined
+    enabled: false
+    country_code: at
+
   - name: BasicLangExtractRecognizer
     supported_languages:
       - en
