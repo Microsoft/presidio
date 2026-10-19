@@ -502,6 +502,9 @@ recognizers:
   - name: IbanRecognizer
     type: predefined
 
+  - name: ImeiRecognizer
+    type: predefined
+
   - name: IpRecognizer
     type: predefined
 
@@ -520,6 +523,10 @@ recognizers:
 
   - name: UrlRecognizer
     type: predefined
+
+  - name: VinRecognizer
+    type: predefined
+    enabled: false
 
   - name: InVoterRecognizer
     type: predefined

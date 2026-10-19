@@ -17,7 +17,8 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |DATE_TIME|Absolute or relative dates or periods or times smaller than a day.|Pattern match and context|
 |EMAIL_ADDRESS|An email address identifies an email box to which email messages are delivered|Pattern match, context and RFC-822 validation|
 |IBAN_CODE|The International Bank Account Number (IBAN) is an internationally agreed system of identifying bank accounts across national borders to facilitate the communication and processing of cross border transactions with a reduced risk of transcription errors.|Pattern match, context and checksum|
-|IP_ADDRESS|An Internet Protocol (IP) address (either IPv4 or IPv6).|Pattern match and context|
+|IMEI|International Mobile Equipment Identity, a 15-digit identifier for mobile devices.|Pattern match, context and checksum|
+|IP_ADDRESS|An Internet Protocol (IP) address (either IPv4 or IPv6).|Pattern match, context and checksum|
 |MAC_ADDRESS| A Media Access Control (MAC) address is a unique identifier assigned to network interfaces for communications on the physical network segment.|Pattern match and context|
 |NRP|A person’s Nationality, religious or political group.|Custom logic and context|
 |LOCATION|Name of politically or geographically defined location (cities, provinces, countries, international regions, bodies of water, mountains|Custom logic and context|
@@ -26,6 +27,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |MEDICAL_LICENSE|Common medical license numbers.|Pattern match, context and checksum|
 |URL|A URL (Uniform Resource Locator), unique identifier used to locate a resource on the Internet|Pattern match, context and top level url validation|
 |UUID|A Universally Unique Identifier (UUID) in the standard 8-4-4-4-12 hyphenated hexadecimal format. Covers RFC 4122 versions 1-5 and RFC 9562 versions 6-8; the nil UUID (all zeros) is excluded as a non-identifying sentinel.|Pattern match, validation of version/variant nibbles, and context|
+|VIN|Vehicle Identification Number, a 17-character identifier assigned to motor vehicles per ISO 3779. Disabled by default.|Pattern match, context and checksum|
 
 ### USA
 

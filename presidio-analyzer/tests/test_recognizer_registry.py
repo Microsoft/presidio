@@ -60,11 +60,14 @@ def test_when_get_recognizers_then_all_recognizers_returned(mock_recognizer_regi
     registry.load_predefined_recognizers()
     recognizers = registry.get_recognizers(language="en", all_fields=True)
 
-    # Loading predefined recognizers should add EN recognizers, and the new
-    # UuidRecognizer should be among them. Avoid asserting an exact count,
-    # since that count changes whenever a recognizer is added or removed.
+    # Loading predefined recognizers should add EN recognizers. Avoid asserting
+    # an exact count, since that count changes whenever a recognizer is added
+    # or removed.
     assert len(recognizers) > count_before_loading
-    assert any(type(rec).__name__ == "UuidRecognizer" for rec in recognizers)
+    recognizer_names = {type(rec).__name__ for rec in recognizers}
+    assert "UuidRecognizer" in recognizer_names
+    assert "ImeiRecognizer" in recognizer_names
+    assert "VinRecognizer" not in recognizer_names
 
 
 def test_when_get_recognizers_then_return_all_fields(mock_recognizer_registry):
