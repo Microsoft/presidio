@@ -59,10 +59,13 @@ class ZaPassportRecognizer(PatternRecognizer):
             name=name,
         )
 
-    def validate_result(self, pattern_text: str) -> bool:  # noqa: D102
+    def validate_result(self, pattern_text: str) -> Optional[bool]:  # noqa: D102
         text = pattern_text.upper()
         if len(text) != self.PASSPORT_LENGTH:
             return False
         if text[0] not in self.ALLOWED_PREFIXES:
             return False
-        return text[1:].isdigit()
+        if not text[1:].isdigit():
+            return False
+        # Shape check only: keep the pattern score, do not promote to 1.0.
+        return None

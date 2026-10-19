@@ -15,35 +15,35 @@ def entities():
 
 
 @pytest.mark.parametrize(
-    "text, expected_len, expected_positions",
+    "text, expected_len, expected_positions, expected_score",
     [
-        ("2009/199240/23", 1, ((0, 14),)),
-        ("2014/256030/07", 1, ((0, 14),)),
-        ("CIPC registration 2020/804826/07", 1, ((18, 32),)),
-        ("CK2001/123456", 1, ((0, 13),)),
-        ("Close corporation CK1998/654321 registered.", 1, ((18, 31),)),
-        ("99/199240/23", 0, ()),
-        ("2009/19924/23", 0, ()),
-        ("2009/199240/234", 0, ()),
-        ("hello world", 0, ()),
+        ("2009/199240/23", 1, ((0, 14),), 0.4),
+        ("2014/256030/07", 1, ((0, 14),), 0.4),
+        ("CIPC registration 2020/804826/07", 1, ((18, 32),), 0.4),
+        ("CK2001/123456", 1, ((0, 13),), 0.3),
+        ("Close corporation CK1998/654321 registered.", 1, ((18, 31),), 0.3),
+        ("99/199240/23", 0, (), None),
+        ("2009/19924/23", 0, (), None),
+        ("2009/199240/234", 0, (), None),
+        ("hello world", 0, (), None),
     ],
 )
 def test_analyze_valid_and_invalid_za_company_registrations(
-    text, expected_len, expected_positions, recognizer, entities, max_score
+    text, expected_len, expected_positions, expected_score, recognizer, entities
 ):
     results = recognizer.analyze(text, entities)
     assert len(results) == expected_len
     for res, (st_pos, fn_pos) in zip(results, expected_positions):
-        assert_result(res, entities[0], st_pos, fn_pos, max_score)
+        assert_result(res, entities[0], st_pos, fn_pos, expected_score)
 
 
 @pytest.mark.parametrize(
     "registration_number, expected",
     [
-        ("2009/199240/23", True),
-        ("2014/256030/07", True),
-        ("CK2001/123456", True),
-        ("K2010/654321", True),
+        ("2009/199240/23", None),
+        ("2014/256030/07", None),
+        ("CK2001/123456", None),
+        ("K2010/654321", None),
         ("99/199240/23", False),
         ("2009/19924/23", False),
         ("AB2001/123456", False),

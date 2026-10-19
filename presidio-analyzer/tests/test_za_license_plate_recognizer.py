@@ -31,22 +31,22 @@ def entities():
     ],
 )
 def test_analyze_valid_and_invalid_za_license_plates(
-    text, expected_len, expected_positions, recognizer, entities, max_score
+    text, expected_len, expected_positions, recognizer, entities
 ):
     results = recognizer.analyze(text, entities)
     assert len(results) == expected_len
     for res, (st_pos, fn_pos) in zip(results, expected_positions):
-        assert_result(res, entities[0], st_pos, fn_pos, max_score)
+        assert_result(res, entities[0], st_pos, fn_pos, 0.3)
 
 
 @pytest.mark.parametrize(
     "plate, expected",
     [
-        ("KD93GKGP", True),
-        ("DK28LFGP", True),
-        ("CC75CXZN", True),
-        ("GET103WP", True),
-        ("015SBZEC", True),
+        ("KD93GKGP", None),
+        ("DK28LFGP", None),
+        ("CC75CXZN", None),
+        ("GET103WP", None),
+        ("015SBZEC", None),
         ("YES", False),
         ("1234GP", False),
     ],

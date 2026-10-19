@@ -30,21 +30,21 @@ def entities():
     ],
 )
 def test_analyze_valid_and_invalid_za_passports(
-    text, expected_len, expected_positions, recognizer, entities, max_score
+    text, expected_len, expected_positions, recognizer, entities
 ):
     results = recognizer.analyze(text, entities)
     assert len(results) == expected_len
     for res, (st_pos, fn_pos) in zip(results, expected_positions):
-        assert_result(res, entities[0], st_pos, fn_pos, max_score)
+        assert_result(res, entities[0], st_pos, fn_pos, 0.2)
 
 
 @pytest.mark.parametrize(
     "passport_number, expected",
     [
-        ("A34855903", True),
-        ("D12345678", True),
-        ("M87654321", True),
-        ("T11223344", True),
+        ("A34855903", None),
+        ("D12345678", None),
+        ("M87654321", None),
+        ("T11223344", None),
         ("B12345678", False),
         ("A1234567", False),
         ("A123456789", False),

@@ -29,20 +29,20 @@ def entities():
     ],
 )
 def test_analyze_valid_and_invalid_za_drivers_licences(
-    text, expected_len, expected_positions, recognizer, entities, max_score
+    text, expected_len, expected_positions, recognizer, entities
 ):
     results = recognizer.analyze(text, entities)
     assert len(results) == expected_len
     for res, (st_pos, fn_pos) in zip(results, expected_positions):
-        assert_result(res, entities[0], st_pos, fn_pos, max_score)
+        assert_result(res, entities[0], st_pos, fn_pos, 0.3)
 
 
 @pytest.mark.parametrize(
     "licence_number, expected",
     [
-        ("60390002CGBV", True),
-        ("4024048D4P60", True),
-        ("30040008X6Z6", True),
+        ("60390002CGBV", None),
+        ("4024048D4P60", None),
+        ("30040008X6Z6", None),
         ("8001015009087", False),
         ("60390002", False),
         ("ABCDEFGHIJK", False),
