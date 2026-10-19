@@ -117,6 +117,27 @@ def test_recognizer_registry_provider_explicit_deny_list_score_is_honored():
     assert all(pattern.score == 0.3 for pattern in recognizer.patterns)
 
 
+def test_recognizer_registry_provider_deny_list_matches_longest_term():
+    provider = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["en"],
+            "recognizers": [
+                {
+                    "name": "Internal names",
+                    "supported_entity": "INTERNAL_NAME",
+                    "deny_list": ["Ann", "Ann Marie"],
+                }
+            ],
+        }
+    )
+    recognizer = provider.create_recognizer_registry().recognizers[0]
+    text = "Patient Ann Marie was admitted."
+
+    results = recognizer.analyze(text, entities=["INTERNAL_NAME"])
+
+    assert [(r.start, r.end, r.score) for r in results] == [(8, 17, 1.0)]
+
+
 def test_recognizer_registry_provider_omitted_thresholds_default_to_empty():
     provider = RecognizerRegistryProvider(
         registry_configuration={

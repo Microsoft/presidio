@@ -130,7 +130,9 @@ class PatternRecognizer(LocalRecognizer):
 
         # Escape deny list elements as preparation for regex
         escaped_deny_list = [re.escape(element) for element in deny_list]
-        regex = r"(?:^|(?<=\W))(" + "|".join(escaped_deny_list) + r")(?:(?=\W)|$)"
+        # (?p): leftmost-longest matching, so a listed "Ann" does not cut
+        # short a match of "Ann Marie"
+        regex = r"(?p)(?:^|(?<=\W))(" + "|".join(escaped_deny_list) + r")(?:(?=\W)|$)"
         return Pattern(name="deny_list", regex=regex, score=self.deny_list_score)
 
     def validate_result(self, pattern_text: str) -> Optional[bool]:
