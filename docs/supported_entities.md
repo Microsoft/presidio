@@ -143,6 +143,7 @@ For more information, refer to the [adding new recognizers documentation](analyz
 ### Sweden
 | FieldType  | Description                                                                                             | Detection Method                         |
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
+| DK_CPR_NUMBER    | The Danish CPR number (personnummer) is a unique 10-digit identifier issued to all Danish residents, encoding the date of birth and gender. | Pattern match, context, date validation and conditional modulus-11 checksum. |
 | SE_ORGANISATIONSNUMMER    | The Swedish Organisations ID Number is a unique 10-digit number issued to all Swedish organisations. | Pattern match, context, and checksum. |
 | SE_PERSONNUMMER    | The Swedish Personal ID Number is a unique 10/12-digit number issued to all Swedish residents. The recognizer also supports Samordningsnummer (coordination numbers) issued to individuals who are not (yet) registered residents but need a Swedish identifier (e.g., temporary workers, students). | Pattern match, context, and checksum. |
 

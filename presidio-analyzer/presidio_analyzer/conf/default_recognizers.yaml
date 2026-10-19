@@ -647,3 +647,10 @@ recognizers:
     type: predefined
     enabled: false
     country_code: ca
+
+  - name: DkCprRecognizer
+    supported_languages:
+    - da
+    type: predefined
+    enabled: false
+    country_code: dk

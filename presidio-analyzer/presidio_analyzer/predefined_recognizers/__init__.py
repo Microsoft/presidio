@@ -14,6 +14,9 @@ from .country_specific.australia.au_tfn_recognizer import AuTfnRecognizer
 from .country_specific.canada.ca_postal_code_recognizer import CaPostalCodeRecognizer
 from .country_specific.canada.ca_sin_recognizer import CaSinRecognizer
 
+# Denmark recognizers
+from .country_specific.denmark.dk_cpr_recognizer import DkCprRecognizer
+
 # Finland recognizers
 from .country_specific.finland.fi_personal_identity_code_recognizer import (
     FiPersonalIdentityCodeRecognizer,
@@ -228,6 +231,7 @@ __all__ = [
     "CreditCardRecognizer",
     "CryptoRecognizer",
     "DateRecognizer",
+    "DkCprRecognizer",
     "EmailRecognizer",
     "IbanRecognizer",
     "IpRecognizer",
