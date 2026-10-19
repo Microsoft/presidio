@@ -27,18 +27,8 @@ def entities():
         ("078.05.1123", 1, ((0, 11),), ((0.5, 0.6),),),
         ("078 05 1123", 1, ((0, 11),), ((0.5, 0.6),),),
         ("abc 078 05 1123 abc", 1, ((4, 15),), ((0.5, 0.6),),),
-        # The truncated "98765432" sample literal must not prefix-block the
-        # neighbouring 987-65-432X family; only the canonical 987-65-4320 sample
-        # is invalidated (by exact match), the rest are real SSN-shaped values
-        ("987-65-4321", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4322", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4323", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4324", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4325", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4326", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4327", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4328", 1, ((0, 11),), ((0.5, 0.6),),),
-        ("987-65-4329", 1, ((0, 11),), ((0.5, 0.6),),),
+        # 899 is the upper boundary before the never-issued 900 series
+        ("899-12-3456", 1, ((0, 11),), ((0.5, 0.6),),),
         # a normal valid SSN is still detected
         ("219-09-9999", 1, ((0, 11),), ((0.5, 0.6),),),
         # no match
@@ -49,8 +39,15 @@ def entities():
         ("078-05-0000", 0, (), (),),
         ("078 00 1123", 0, (), (),),
         ("693-09.4444", 0, (), (),),
-        # canonical sample SSNs stay invalidated (now via exact match)
+        # all 900-series area numbers are never issued by the SSA
+        ("90012-3456", 0, (), (),),
+        ("900-123456", 0, (), (),),
+        ("900123456", 0, (), (),),
+        ("900-12-3456", 0, (), (),),
         ("987-65-4320", 0, (), (),),
+        ("987-65-4321", 0, (), (),),
+        ("999-12-3456", 0, (), (),),
+        # canonical sample SSNs stay invalidated via exact match
         ("078-05-1120", 0, (), (),),
         ("123-45-6789", 0, (), (),),
         # never-issued area numbers (000/666) stay invalidated via the area check

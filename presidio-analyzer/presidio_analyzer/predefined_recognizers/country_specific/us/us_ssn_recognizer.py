@@ -77,11 +77,12 @@ class UsSsnRecognizer(PatternRecognizer):
             # groups cannot be all zeros
             return True
 
-        if only_digits[:3] in ("000", "666"):
+        area_number = only_digits[:3]
+        if area_number in ("000", "666") or area_number.startswith("9"):
             # area number (first group) is never issued by the SSA
             return True
 
-        if only_digits in ("123456789", "987654320", "078051120"):
+        if only_digits in ("123456789", "078051120"):
             # canonical sample/placeholder SSNs published for examples
             return True
 
