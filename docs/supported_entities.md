@@ -192,6 +192,19 @@ For more information, refer to the [adding new recognizers documentation](analyz
 | DE_HANDELSREGISTER | German Handelsregisternummer: commercial register number with HRA (sole traders / partnerships) or HRB (corporations) prefix followed by 1–6 digits. HRA entries directly identify natural persons (sole traders). Legal basis: §§ 9, 14 HGB, HRV. | Pattern match and context |
 | DE_PLZ | German Postleitzahl (postal code): 5-digit code in the range 01001–99998. Constitutes personal data in combination with other address fields (DSGVO Art. 4 Nr. 1). **High false-positive risk** – only reliable with address-context words present; base confidence is 0.05. Legal basis: DSGVO Art. 4 Nr. 1. | Pattern match and context (context required for actionable results) |
 
+### Czechia
+
+| Entity Type | Description | Detection Method |
+| --- | --- | --- |
+| CZ_BIRTH_NUMBER | Czech rodné číslo (birth number): the national identification number encoding date of birth and sex, formatted YYMMDD/SSS (until 1953) or YYMMDD/SSSS (since 1954), with or without the slash. Legal basis: § 13 zákona č. 133/2000 Sb. | Pattern match, context and checksum (mod 11, incl. the 1954–1985 historical exception) |
+| CZ_BANK_ACCOUNT | Czech domestic bank account number in the national format `[prefix-]number/bank code` (e.g. 19-2000145399/0800). Legal basis: vyhláška ČNB č. 169/2011 Sb. | Pattern match, context and checksum (weighted mod 11 on prefix and account number) |
+| CZ_ID_CARD | Czech občanský průkaz (identity card) number: 9 digits on machine readable cards and the current eOP. **Context words required for actionable results** — base confidence is 0.2. Legal basis: zákon č. 269/2021 Sb. | Pattern match and context |
+| CZ_PASSPORT | Czech cestovní pas (passport) number: 2 letters + 6–7 digits (older series) or 7–8 digits (biometric series). Legal basis: zákon č. 329/1999 Sb. | Pattern match and context |
+| CZ_DRIVER_LICENSE | Czech řidičský průkaz (driving licence) number: 2 letters + 6–9 digits. Legal basis: § 103 zákona č. 361/2000 Sb. | Pattern match and context |
+
+Czech-language pipelines additionally get `DATE_TIME` coverage for Czech date
+notation ("12. dubna 1985", "12. 4. 1985") through the `CzDateRecognizer`.
+
 ### Medical / Clinical
 
 Detected using the `MedicalNERRecognizer` (requires the `transformers` extra). Uses the [blaze999/Medical-NER](https://huggingface.co/blaze999/Medical-NER) model by default.

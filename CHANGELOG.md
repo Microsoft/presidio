@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Added `NoOpNlpEngine` for configurations that do not require NLP engine artifacts, enabling standalone recognizers such as `HuggingFaceNerRecognizer` to run without a spaCy or Stanza model (#2071) (Thanks @ultramancode)
 - Added per-recognizer and per-entity score threshold configuration in the recognizer registry YAML, with the analyzer's global `default_score_threshold` as the fallback (#2116) (Thanks @rodboev)
 - Added `PhUmidRecognizer` for Philippine Unified Multi-Purpose ID (UMID/CRN) numbers in dashed and plain 12-digit formats; disabled by default (#2045) (Thanks @Surya-5555)
+- Czech PII recognizers for `CZ_BIRTH_NUMBER`, `CZ_BANK_ACCOUNT`, `CZ_ID_CARD`, `CZ_PASSPORT`, and `CZ_DRIVER_LICENSE`, plus Czech `DATE_TIME` date coverage (`CzDateRecognizer`); all are disabled by default. Includes a Czech language support recipe (`docs/recipes/czech-language-support`)
 
 #### Changed
 - The `kr` language code is deprecated in favor of the ISO 639-1 code `ko`. `KrRrnRecognizer` and `KrPassportRecognizer` still accept `kr` in `supported_languages` as a backward-compatibility alias for registries configured against their original class defaults; the alias will be removed in <release TBD>. `KrBrnRecognizer`, `KrDriverLicenseRecognizer` and `KrFrnRecognizer` have only ever defaulted to `ko`, so `kr` was removed from their `default_recognizers.yaml` entries in this release. (#2236)

@@ -625,6 +625,49 @@ recognizers:
     enabled: false
     country_code: de
 
+  # Czechia recognizers (disabled by default, enable for Czech-language pipelines)
+  - name: CzBirthNumberRecognizer
+    supported_languages:
+    - cs
+    type: predefined
+    enabled: false
+    country_code: cz
+
+  - name: CzBankAccountRecognizer
+    supported_languages:
+    - cs
+    type: predefined
+    enabled: false
+    country_code: cz
+
+  - name: CzIdCardRecognizer
+    supported_languages:
+    - cs
+    type: predefined
+    enabled: false
+    country_code: cz
+
+  - name: CzPassportRecognizer
+    supported_languages:
+    - cs
+    type: predefined
+    enabled: false
+    country_code: cz
+
+  - name: CzDriverLicenseRecognizer
+    supported_languages:
+    - cs
+    type: predefined
+    enabled: false
+    country_code: cz
+
+  - name: CzDateRecognizer
+    supported_languages:
+    - cs
+    type: predefined
+    enabled: false
+    country_code: cz
+
   - name: BasicLangExtractRecognizer
     supported_languages:
       - en

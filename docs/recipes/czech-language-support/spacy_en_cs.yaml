@@ -1,0 +1,30 @@
+nlp_engine_name: spacy
+models:
+  -
+    lang_code: en
+    model_name: en_core_web_lg
+  -
+    # spaCy publishes no Czech-specific pretrained pipeline; the official
+    # multilingual WikiNER model provides PER/LOC/ORG NER for Czech text.
+    # See the recipe README for a higher-quality transformers alternative.
+    lang_code: cs
+    model_name: xx_ent_wiki_sm
+
+ner_model_configuration:
+  model_to_presidio_entity_mapping:
+    PER: PERSON
+    PERSON: PERSON
+    NORP: NRP
+    FAC: LOCATION
+    LOC: LOCATION
+    LOCATION: LOCATION
+    GPE: LOCATION
+    ORG: ORGANIZATION
+    ORGANIZATION: ORGANIZATION
+    DATE: DATE_TIME
+    TIME: DATE_TIME
+
+  low_confidence_score_multiplier: 0.4
+  low_score_entity_names:
+  - ORG
+  - ORGANIZATION
