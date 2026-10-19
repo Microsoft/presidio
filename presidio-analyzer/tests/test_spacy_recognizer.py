@@ -1,3 +1,4 @@
+import warnings
 
 import pytest
 from spacy.tokens import Span, Doc
@@ -115,3 +116,19 @@ def test_entity_not_returned_if_not_in_supported_entities(mock_nlp_artifacts):
         text="text", nlp_artifacts=mock_nlp_artifacts, entities=["DATE_TIME"]
     )
     assert len(res) == 0
+
+
+def test_ner_strength_is_deprecated_and_has_no_effect(mock_nlp_artifacts):
+    with pytest.warns(DeprecationWarning, match="ner_strength"):
+        spacy_recognizer = SpacyRecognizer(ner_strength=0.1)
+
+    res = spacy_recognizer.analyze(
+        text="text", nlp_artifacts=mock_nlp_artifacts, entities=["PERSON"]
+    )
+    assert [r.score for r in res] == [0.9]
+
+
+def test_default_construction_does_not_warn():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        SpacyRecognizer()
