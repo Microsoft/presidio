@@ -1,10 +1,13 @@
 import sys
-
-import pytest
 from unittest.mock import MagicMock, patch
 
-from presidio_analyzer.predefined_recognizers import GLiNERRecognizer
+import pytest
 from presidio_analyzer.chunkers import CharacterBasedTextChunker
+from presidio_analyzer.input_validation import ConfigurationValidator
+from presidio_analyzer.predefined_recognizers import GLiNERRecognizer
+from presidio_analyzer.recognizer_registry.recognizers_loader_utils import (
+    RecognizerListLoader,
+)
 
 
 @pytest.fixture
@@ -259,6 +262,131 @@ def test_gliner_deduplicates_entities_in_overlap_region(mock_gliner):
 GLINER_MOCK_PATH = (
     "presidio_analyzer.predefined_recognizers.ner.gliner_recognizer.GLiNER"
 )
+
+
+def test_requested_entities_are_added_as_ad_hoc_labels_by_default():
+    """Requested entities not covered by the mapping remain labels by default."""
+    text = "Acme HQ is at 1 Main Street."
+    entities = ["ORGANIZATION", "PRODUCT", "ADDRESS"]
+    address_model = MagicMock()
+    address_model.predict_entities.return_value = [
+        {"label": "ORGANIZATION", "start": 0, "end": 4, "score": 0.70},
+        {"label": "address", "start": 14, "end": 27, "score": 0.90},
+    ]
+
+    with patch(GLINER_MOCK_PATH) as mock_gliner_class:
+        mock_gliner_class.from_pretrained.return_value = address_model
+        address_recognizer = GLiNERRecognizer(
+            name="AddressGLiNER",
+            entity_mapping={"address": "ADDRESS"},
+            threshold=0.65,
+            map_location="cpu",
+        )
+
+    address_results = address_recognizer.analyze(text, entities)
+    address_call = address_model.predict_entities.call_args.kwargs
+
+    assert address_call["labels"] == ["address", "ORGANIZATION", "PRODUCT"]
+    assert address_call["threshold"] == 0.65
+    assert {result.entity_type for result in address_results} == {
+        "ADDRESS",
+        "ORGANIZATION",
+    }
+
+
+def test_yaml_can_scope_multiple_recognizers_to_configured_labels():
+    """YAML can keep each GLiNERRecognizer scoped to its configured labels."""
+    text = "Acme HQ is at 1 Main Street."
+    entities = ["ORGANIZATION", "PRODUCT", "ADDRESS"]
+    organization_model = MagicMock()
+    organization_model.predict_entities.return_value = []
+    address_model = MagicMock()
+    address_model.predict_entities.return_value = [
+        {"label": "address", "start": 14, "end": 27, "score": 0.90}
+    ]
+    raw_config = {
+        "supported_languages": ["en"],
+        "global_regex_flags": 26,
+        "recognizers": [
+            {
+                "name": "OrganizationGLiNER",
+                "class_name": "GLiNERRecognizer",
+                "type": "predefined",
+                "supported_language": "en",
+                "entity_mapping": {"organization": "ORGANIZATION"},
+                "threshold": 0.80,
+                "include_requested_entities_as_labels": False,
+                "map_location": "cpu",
+            },
+            {
+                "name": "AddressGLiNER",
+                "class_name": "GLiNERRecognizer",
+                "type": "predefined",
+                "supported_language": "en",
+                "entity_mapping": {"address": "ADDRESS"},
+                "threshold": 0.65,
+                "include_requested_entities_as_labels": False,
+                "map_location": "cpu",
+            }
+        ],
+    }
+    validated_config = (
+        ConfigurationValidator.validate_recognizer_registry_configuration(raw_config)
+    )
+
+    with patch(GLINER_MOCK_PATH) as mock_gliner_class:
+        mock_gliner_class.from_pretrained.side_effect = [
+            organization_model,
+            address_model,
+        ]
+        recognizers = list(RecognizerListLoader.get(**validated_config))
+
+    recognizers_by_name = {recognizer.name: recognizer for recognizer in recognizers}
+    organization_results = recognizers_by_name["OrganizationGLiNER"].analyze(
+        text, entities
+    )
+    address_results = recognizers_by_name["AddressGLiNER"].analyze(text, entities)
+    organization_call = organization_model.predict_entities.call_args.kwargs
+    address_call = address_model.predict_entities.call_args.kwargs
+
+    assert organization_call["labels"] == ["organization"]
+    assert organization_call["threshold"] == 0.80
+    assert address_call["labels"] == ["address"]
+    assert address_call["threshold"] == 0.65
+    assert organization_results == []
+    assert [result.entity_type for result in address_results] == ["ADDRESS"]
+
+
+def test_include_requested_entities_option_preserves_positional_arguments():
+    """Existing positional constructor arguments keep their meaning."""
+    text_chunker = MagicMock()
+    with patch(GLINER_MOCK_PATH) as mock_gliner_class:
+        mock_gliner_class.from_pretrained.return_value = MagicMock()
+        recognizer = GLiNERRecognizer(
+            ["PERSON"],
+            "PositionalGLiNER",
+            "en",
+            "1.0.0",
+            None,
+            None,
+            "custom/gliner-model",
+            True,
+            False,
+            0.42,
+            "cpu",
+            text_chunker,
+            400,
+            60,
+            True,
+            "custom.onnx",
+        )
+
+    assert recognizer.threshold == 0.42
+    assert recognizer.map_location == "cpu"
+    assert recognizer.text_chunker is text_chunker
+    assert recognizer.load_onnx_model is True
+    assert recognizer.onnx_model_file == "custom.onnx"
+    assert recognizer.include_requested_entities_as_labels is True
 
 
 @pytest.mark.parametrize(

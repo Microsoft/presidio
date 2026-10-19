@@ -273,6 +273,12 @@ class GLiNERRecognizerConfig(PredefinedRecognizerConfig):
         None, description="Use multi-label classification"
     )
     threshold: Optional[float] = Field(None, description="Confidence threshold")
+    include_requested_entities_as_labels: Optional[bool] = Field(
+        None,
+        description=(
+            "Add requested entities not covered by entity_mapping as GLiNER labels"
+        ),
+    )
     map_location: Optional[str] = Field(None, description="Device (cpu/gpu/etc.)")
     load_onnx_model: Optional[bool] = Field(None, description="Load ONNX model")
     onnx_model_file: Optional[str] = Field(None, description="ONNX model file name")
