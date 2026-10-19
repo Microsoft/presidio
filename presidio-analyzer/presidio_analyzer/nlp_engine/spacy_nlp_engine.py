@@ -28,6 +28,11 @@ class SpacyNlpEngine(NlpEngine):
     engine_name = "spacy"
     is_available = bool(spacy)
 
+    @property
+    def has_ner(self) -> bool:
+        """Returns True if this engine performs Named Entity Recognition natively."""
+        return True
+
     def __init__(
         self,
         models: Optional[List[Dict[str, str]]] = None,

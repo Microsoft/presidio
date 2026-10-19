@@ -153,9 +153,9 @@ The default configuration of `AnalyzerEngine` is defined in the following files:
 In general, recognizers that are not added to the configuration would not be created, with one exception.
 
 ### Enabling/Disabling the NLP recognizer
-One exception to this is the recognizer which extracts the `NlpEngine` entities (e.g. `SpacyRecognizer` when the `NlpEngine` is `SpacyNlpEngine`; `TransformersRecognizer` when the engine is `TransformersNlpEngine` and `StanzaRecognizer` when the engine is `StanzaNlpEngine`). 
+One exception to this is the recognizer which extracts the `NlpEngine` entities when the engine provides native NER output (e.g. `SpacyRecognizer` when the `NlpEngine` is `SpacyNlpEngine`; `TransformersRecognizer` when the engine is `TransformersNlpEngine` and `StanzaRecognizer` when the engine is `StanzaNlpEngine`).
 
-Recognizers (including the NLP recognizer) could be disabled by defining `enabled=false` in the YAML configuration. For example:
+Recognizers (including the NLP recognizer) could be disabled by defining `enabled: false` in the YAML configuration. For example:
 ```yaml
 recognizer_registry:
   global_regex_flags: 26

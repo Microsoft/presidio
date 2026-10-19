@@ -23,6 +23,11 @@ class NoOpNlpEngine(NlpEngine):
     engine_name = "no_op"
     is_available = True
 
+    @property
+    def has_ner(self) -> bool:
+        """Return False because this engine produces no NER output."""
+        return False
+
     def __init__(
         self,
         models: List[Dict[str, str]],

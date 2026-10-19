@@ -64,6 +64,11 @@ class SlimSpacyNlpEngine(NlpEngine):
     engine_name = "slim"
     is_available = bool(spacy)
 
+    @property
+    def has_ner(self) -> bool:
+        """Return False because the slim pipeline does not include NER."""
+        return False
+
     def __init__(
         self,
         models: Optional[List[Dict[str, str]]] = None,

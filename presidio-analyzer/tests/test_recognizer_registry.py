@@ -12,11 +12,13 @@ from presidio_analyzer import (
     PatternRecognizer,
     RecognizerRegistry,
 )
+from presidio_analyzer.nlp_engine import TransformersNlpEngine
 from presidio_analyzer.recognizer_registry import RecognizerRegistryProvider
 from presidio_analyzer.recognizer_registry.recognizers_loader_utils import (
     RecognizerListLoader,
 )
 from presidio_analyzer.predefined_recognizers import SpacyRecognizer, UsSsnRecognizer
+from tests.mocks import NlpEngineMock
 
 
 def create_mock_pattern_recognizer(lang, entity, name):
@@ -52,6 +54,25 @@ def mock_recognizer_registry():
             pattern_recognizer5,
         ],
     )
+
+
+def test_when_custom_engine_has_ner_then_spacy_recognizer_is_returned_without_warning(
+    caplog,
+):
+    recognizer = RecognizerRegistry.get_nlp_recognizer(NlpEngineMock())
+
+    assert recognizer is SpacyRecognizer
+    assert not caplog.records
+
+
+def test_when_known_engine_type_has_ner_false_then_get_nlp_recognizer_raises():
+    class TransformersNlpEngineWithoutNer(TransformersNlpEngine):
+        @property
+        def has_ner(self) -> bool:
+            return False
+
+    with pytest.raises(ValueError, match="does not have an NLP recognizer"):
+        RecognizerRegistry.get_nlp_recognizer(TransformersNlpEngineWithoutNer())
 
 
 def test_when_get_recognizers_then_all_recognizers_returned(mock_recognizer_registry):

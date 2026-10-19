@@ -9,8 +9,6 @@ import yaml
 from presidio_analyzer import EntityRecognizer, PatternRecognizer
 from presidio_analyzer.nlp_engine import (
     NlpEngine,
-    NoOpNlpEngine,
-    SpacyNlpEngine,
     StanzaNlpEngine,
     TransformersNlpEngine,
 )
@@ -59,7 +57,7 @@ class RecognizerRegistry:
         self, nlp_engine: Optional[NlpEngine]
     ) -> None:
         """Validate that registered recognizers can use the selected NLP engine."""
-        if not isinstance(nlp_engine, NoOpNlpEngine):
+        if nlp_engine is None or nlp_engine.has_ner:
             return
 
         nlp_recognizers = [
@@ -68,8 +66,9 @@ class RecognizerRegistry:
         if nlp_recognizers:
             names = sorted({rec.__class__.__name__ for rec in nlp_recognizers})
             raise ValueError(
-                "NoOpNlpEngine cannot be used with NLP engine recognizers. "
-                f"Remove or disable these recognizers: {names}."
+                f"{nlp_engine.__class__.__name__} does not provide NER output "
+                f"required by these recognizers: {names}. "
+                "Remove or disable them."
             )
 
     def _create_nlp_recognizer(
@@ -79,7 +78,7 @@ class RecognizerRegistry:
     ) -> SpacyRecognizer:
         nlp_recognizer = self.get_nlp_recognizer(nlp_engine)
 
-        if nlp_engine:
+        if nlp_engine is not None:
             return nlp_recognizer(
                 supported_language=supported_language,
                 supported_entities=nlp_engine.get_supported_entities(),
@@ -87,20 +86,27 @@ class RecognizerRegistry:
 
         return nlp_recognizer(supported_language=supported_language)
 
-    def add_nlp_recognizer(self, nlp_engine: NlpEngine) -> None:
+    def add_nlp_recognizer(self, nlp_engine: Optional[NlpEngine]) -> None:
         """
-        Adding NLP recognizer in accordance with the nlp engine.
+        Add an NLP recognizer when the engine provides native NER output.
+
+        For engines without NER output, validate compatibility and skip
+        registration.
 
         :param nlp_engine: The NLP engine.
         :return: None
         """
 
-        if isinstance(nlp_engine, NoOpNlpEngine):
+        if nlp_engine is not None and not nlp_engine.has_ner:
             self.validate_nlp_engine_compatibility(nlp_engine)
-            logger.info("Skipping NLP recognizer registration for no-op NLP engine.")
+            logger.debug(
+                "Skipping NLP recognizer registration for %s because it does not "
+                "provide NER output.",
+                nlp_engine.__class__.__name__,
+            )
             return
 
-        if not nlp_engine:
+        if nlp_engine is None:
             supported_languages = self.supported_languages
         else:
             supported_languages = nlp_engine.get_supported_languages()
@@ -117,7 +123,7 @@ class RecognizerRegistry:
     def load_predefined_recognizers(
         self,
         languages: Optional[List[str]] = None,
-        nlp_engine: NlpEngine = None,
+        nlp_engine: Optional[NlpEngine] = None,
         countries: Optional[List[str]] = None,
     ) -> None:
         """
@@ -164,25 +170,22 @@ class RecognizerRegistry:
 
     @staticmethod
     def get_nlp_recognizer(
-        nlp_engine: NlpEngine,
+        nlp_engine: Optional[NlpEngine],
     ) -> Type[SpacyRecognizer]:
-        """Return the recognizer leveraging the selected NLP Engine."""
+        """Return the recognizer leveraging the selected NLP Engine.
 
+        :raises ValueError: If the engine does not provide NER output.
+        """
+
+        if nlp_engine is not None and not nlp_engine.has_ner:
+            raise ValueError(
+                f"{nlp_engine.__class__.__name__} does not have an NLP recognizer"
+            )
         if isinstance(nlp_engine, StanzaNlpEngine):
             return StanzaRecognizer
         if isinstance(nlp_engine, TransformersNlpEngine):
             return TransformersRecognizer
-        if isinstance(nlp_engine, NoOpNlpEngine):
-            raise ValueError("NoOpNlpEngine does not have an NLP recognizer")
-        if not nlp_engine or isinstance(nlp_engine, SpacyNlpEngine):
-            return SpacyRecognizer
-        else:
-            logger.warning(
-                "nlp engine should be either SpacyNlpEngine,"
-                "StanzaNlpEngine or TransformersNlpEngine"
-            )
-            # Returning default
-            return SpacyRecognizer
+        return SpacyRecognizer
 
     def get_recognizers(
         self,

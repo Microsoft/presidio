@@ -6,7 +6,7 @@ In its default configuration, it contains recognizers and models for English.
 To extend Presidio to detect PII in an additional language, these modules require modification:
 
 1. The `NlpEngine` containing the NLP model which performs tokenization,
-lemmatization, Named Entity Recognition and other NLP tasks.
+lemmatization, Named Entity Recognition (if supported), and other NLP tasks.
 2. PII recognizers (different `EntityRecognizer` objects) should be adapted or created.
 
 !!! note "Note"

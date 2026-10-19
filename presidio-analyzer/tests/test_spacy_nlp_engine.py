@@ -14,6 +14,10 @@ class SetEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+def test_has_ner_is_true():
+    assert SpacyNlpEngine().has_ner is True
+
+
 def test_simple_process_text(spacy_nlp_engine):
     nlp_artifacts = spacy_nlp_engine.process_text("simple text", language="en")
     assert len(nlp_artifacts.tokens) == 2

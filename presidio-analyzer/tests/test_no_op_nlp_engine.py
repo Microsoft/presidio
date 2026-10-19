@@ -25,6 +25,9 @@ def no_op_nlp_engine():
 
 
 class TestNoOpNlpEngine:
+    def test_has_ner_is_false(self, no_op_nlp_engine):
+        assert no_op_nlp_engine.has_ner is False
+
     def test_when_init_without_models_then_raises(self):
         with pytest.raises(TypeError):
             NoOpNlpEngine()
@@ -285,7 +288,10 @@ class TestNoOpNlpEngineAnalyzerIntegration:
             recognizers=[SpacyRecognizer()], supported_languages=["en"]
         )
 
-        with pytest.raises(ValueError, match="NoOpNlpEngine cannot be used"):
+        with pytest.raises(
+            ValueError,
+            match="NoOpNlpEngine does not provide NER output",
+        ):
             AnalyzerEngine(registry=registry, nlp_engine=no_op_nlp_engine)
 
     def test_when_get_nlp_recognizer_with_no_op_then_raises(self, no_op_nlp_engine):
@@ -428,5 +434,8 @@ recognizer_registry:
 
         provider = AnalyzerEngineProvider(analyzer_engine_conf_file=analyzer_conf_file)
 
-        with pytest.raises(ValueError, match="NoOpNlpEngine cannot be used"):
+        with pytest.raises(
+            ValueError,
+            match="NoOpNlpEngine does not provide NER output",
+        ):
             provider.create_engine()

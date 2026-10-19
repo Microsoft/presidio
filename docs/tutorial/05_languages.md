@@ -2,7 +2,7 @@
 
 Two main parts in Presidio handle the text, and should be adapted if a new language is required:
 
-1. The `NlpEngine` containing the NLP model which performs tokenization, lemmatization, Named Entity Recognition and other NLP tasks.
+1. The `NlpEngine` containing the NLP model which performs tokenization, lemmatization, Named Entity Recognition (if supported), and other NLP tasks.
 2. The different PII recognizers (`EntityRecognizer` objects) should be adapted or created.
 
 ## Adapting the NLP engine

@@ -92,6 +92,7 @@ classDiagram
     }
 
     class NlpEngine {
+        +bool has_ner
         +process_text(text, language) NlpArtifacts
         +process_batch(texts, language) Iterator[NlpArtifacts]
     }

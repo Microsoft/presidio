@@ -2,11 +2,17 @@ from typing import Iterator
 
 import pytest
 
+from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_analyzer.nlp_engine import (
     NlpEngineProvider,
     SlimSpacyNlpEngine,
 )
 from presidio_analyzer.nlp_engine.slim_spacy_nlp_engine import DEFAULT_SLIM_MODELS
+from presidio_analyzer.predefined_recognizers import SpacyRecognizer
+from presidio_analyzer.recognizer_registry import (
+    RecognizerRegistry,
+    RecognizerRegistryProvider,
+)
 
 
 @pytest.fixture(scope="module")
@@ -271,6 +277,9 @@ class TestSlimSpacyNlpEngineLinguisticUtils:
 class TestSlimSpacyNlpEngineSupportedEntitiesAndLanguages:
     """Tests for supported entities and languages."""
 
+    def test_has_ner_is_false(self, slim_nlp_engine):
+        assert slim_nlp_engine.has_ner is False
+
     def test_when_get_supported_entities_then_empty(self, slim_nlp_engine):
         assert slim_nlp_engine.get_supported_entities() == []
 
@@ -281,6 +290,81 @@ class TestSlimSpacyNlpEngineSupportedEntitiesAndLanguages:
         engine = SlimSpacyNlpEngine()
         with pytest.raises(ValueError, match="not loaded"):
             engine.get_supported_languages()
+
+
+class TestSlimSpacyNlpEngineRegistryIntegration:
+    """Tests for registering a slim engine with analyzer registries."""
+
+    def test_when_registry_adds_slim_engine_then_spacy_recognizer_is_not_added(
+        self, slim_nlp_engine
+    ):
+        registry = RecognizerRegistry(supported_languages=["en"])
+
+        registry.add_nlp_recognizer(slim_nlp_engine)
+
+        assert registry.recognizers == []
+
+    def test_when_provider_uses_slim_engine_then_no_spacy_entities_are_advertised(
+        self, slim_nlp_engine
+    ):
+        provider = RecognizerRegistryProvider(
+            registry_configuration={
+                "supported_languages": ["en"],
+                "recognizers": [{"name": "CreditCardRecognizer", "type": "predefined"}],
+            },
+            nlp_engine=slim_nlp_engine,
+        )
+
+        registry = provider.create_recognizer_registry()
+
+        assert not any(
+            isinstance(recognizer, SpacyRecognizer)
+            for recognizer in registry.recognizers
+        )
+        assert registry.get_supported_entities(languages=["en"]) == ["CREDIT_CARD"]
+
+    def test_when_get_nlp_recognizer_with_slim_engine_then_raises(
+        self, slim_nlp_engine
+    ):
+        with pytest.raises(ValueError, match="does not have an NLP recognizer"):
+            RecognizerRegistry.get_nlp_recognizer(slim_nlp_engine)
+
+    def test_when_analyzer_uses_slim_with_spacy_recognizer_then_raises(
+        self, slim_nlp_engine
+    ):
+        registry = RecognizerRegistry(
+            recognizers=[SpacyRecognizer()], supported_languages=["en"]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="SlimSpacyNlpEngine does not provide NER output",
+        ):
+            AnalyzerEngine(registry=registry, nlp_engine=slim_nlp_engine)
+
+    def test_when_analyzer_uses_slim_then_in_text_context_enhances_score(
+        self, slim_nlp_engine
+    ):
+        zip_recognizer = PatternRecognizer(
+            supported_entity="ZIP",
+            patterns=[Pattern(name="zip", regex=r"\b\d{5}\b", score=0.3)],
+            context=["zip"],
+        )
+        registry = RecognizerRegistry(
+            recognizers=[zip_recognizer], supported_languages=["en"]
+        )
+        analyzer = AnalyzerEngine(registry=registry, nlp_engine=slim_nlp_engine)
+
+        results = analyzer.analyze(
+            text="my zip code is 10023",
+            language="en",
+            entities=["ZIP"],
+            return_decision_process=True,
+        )
+
+        assert len(results) == 1
+        assert results[0].score > 0.3
+        assert results[0].analysis_explanation.supportive_context_word == "zip"
 
 
 class TestSlimSpacyNlpEngineProvider:
