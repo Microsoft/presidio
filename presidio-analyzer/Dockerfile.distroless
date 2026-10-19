@@ -1,0 +1,86 @@
+# Hardened distroless variant of the presidio-analyzer service.
+#
+# Built on Microsoft Azure Linux distroless, which ships no shell, no package
+# manager and no build tooling, so the resulting image has a far smaller
+# vulnerability surface than the Debian slim variant. See ../docs/installation.md
+# for the behavioural differences between the two variants.
+#
+# Behavioural differences vs. ./Dockerfile:
+#   * No shell, so entrypoint.sh cannot run. Gunicorn is started directly and
+#     configured through GUNICORN_CMD_ARGS instead of the PORT/WORKERS variables.
+#   * Runs as the base image's nonroot user, UID 65532.
+
+# ---- builder: pip and build tooling exist only in this stage ----
+FROM mcr.microsoft.com/azurelinux/base/python:3.12 AS builder
+
+# Optional alternate package index for environments without direct PyPI access.
+# Left empty by default so public builds use PyPI.
+ARG PIP_INDEX_URL
+ARG NLP_CONF_FILE=presidio_analyzer/conf/default.yaml
+ARG ANALYZER_CONF_FILE=presidio_analyzer/conf/default_analyzer.yaml
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_NO_CACHE_DIR=1
+
+# A virtualenv is required rather than `pip install --prefix`: spacy's model
+# download shells out to pip, which ignores --prefix and would install the
+# models into the wrong tree. The service then fails at startup because the
+# model package cannot be imported.
+RUN python3 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH \
+    VIRTUAL_ENV=/opt/venv
+
+WORKDIR /src
+
+COPY pyproject.toml ./
+COPY presidio_analyzer ./presidio_analyzer
+
+# .dockerignore excludes *.md, but pyproject.toml declares a readme, so the
+# build backend needs a placeholder to resolve project metadata.
+RUN printf "# presidio-analyzer\n" > README.md \
+    && pip install --no-cache-dir ".[server]"
+
+# Install the NLP models declared in NLP_CONF_FILE, or via nlp_configuration
+# in ANALYZER_CONF_FILE.
+COPY install_nlp_models.py ./
+RUN python install_nlp_models.py \
+    --conf_file ${NLP_CONF_FILE} \
+    --analyzer_conf_file ${ANALYZER_CONF_FILE}
+
+# Packaging tooling is only needed at build time. Removing it here keeps future
+# pip/setuptools/wheel advisories from landing on the runtime image.
+RUN pip uninstall -y pip setuptools wheel 2>/dev/null || true
+
+# ---- runtime ----
+FROM mcr.microsoft.com/azurelinux/distroless/python:3.12-nonroot AS runtime
+
+# The distroless image has no shell, so gunicorn is invoked directly. Override
+# workers, bind address or any other gunicorn setting via GUNICORN_CMD_ARGS.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    GUNICORN_CMD_ARGS="--workers=1 --bind=0.0.0.0:3000" \
+    ANALYZER_CONF_FILE=presidio_analyzer/conf/default_analyzer.yaml \
+    RECOGNIZER_REGISTRY_CONF_FILE=presidio_analyzer/conf/default_recognizers.yaml \
+    NLP_CONF_FILE=presidio_analyzer/conf/default.yaml
+
+COPY --from=builder /opt/venv/lib/python3.12/site-packages /usr/lib/python3.12/site-packages
+
+WORKDIR /app
+
+# The service is served from the copied source tree, which precedes
+# site-packages on sys.path. logging.ini is required: gunicorn fails to start
+# without it.
+COPY app.py logging.ini ./
+COPY presidio_analyzer ./presidio_analyzer
+
+USER 65532
+
+EXPOSE 3000
+
+# curl is unavailable (and would pull in a large TLS/auth dependency tree), so
+# the health check uses the Python standard library instead. Loading the spaCy
+# model takes noticeably longer than the anonymizer's startup, hence the longer
+# start period.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
+    CMD ["/usr/bin/python3", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:3000/health',timeout=3).status==200 else 1)"]
+
+ENTRYPOINT ["/usr/bin/python3", "-m", "gunicorn", "app:create_app()"]

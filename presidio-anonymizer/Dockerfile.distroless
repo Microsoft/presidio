@@ -1,0 +1,63 @@
+# Hardened distroless variant of the presidio-anonymizer service.
+#
+# Built on Microsoft Azure Linux distroless, which ships no shell, no package
+# manager and no build tooling, so the resulting image has a far smaller
+# vulnerability surface than the Debian slim variant. See ../docs/installation.md
+# for the behavioural differences between the two variants.
+#
+# Behavioural differences vs. ./Dockerfile:
+#   * No shell, so entrypoint.sh cannot run. Gunicorn is started directly and
+#     configured through GUNICORN_CMD_ARGS instead of the PORT/WORKERS variables.
+#   * Runs on Python 3.12 (the only version Azure Linux distroless publishes),
+#     not 3.14. presidio-anonymizer supports >=3.10,<3.15.
+#   * Runs as the base image's nonroot user, UID 65532.
+
+# ---- builder: pip and build tooling exist only in this stage ----
+FROM mcr.microsoft.com/azurelinux/base/python:3.12 AS builder
+
+# Optional alternate package index for environments without direct PyPI access.
+# Left empty by default so public builds use PyPI.
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /src
+
+COPY pyproject.toml ./
+COPY presidio_anonymizer ./presidio_anonymizer
+
+# .dockerignore excludes *.md, but pyproject.toml declares a readme, so the
+# build backend needs a placeholder to resolve project metadata.
+RUN printf "# presidio-anonymizer\n" > README.md \
+    && python3 -m pip install --no-cache-dir --prefix=/install ".[server]"
+
+# ---- runtime ----
+FROM mcr.microsoft.com/azurelinux/distroless/python:3.12-nonroot AS runtime
+
+# The distroless image has no shell, so gunicorn is invoked directly. Override
+# workers, bind address or any other gunicorn setting via GUNICORN_CMD_ARGS.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    GUNICORN_CMD_ARGS="--workers=1 --bind=0.0.0.0:3000"
+
+COPY --from=builder /install/lib/python3.12/site-packages /usr/lib/python3.12/site-packages
+COPY --from=builder /install/bin /usr/local/bin
+
+WORKDIR /app
+
+# The service is served from the copied source tree, which precedes
+# site-packages on sys.path. logging.ini is required: gunicorn fails to start
+# without it.
+COPY app.py logging.ini ./
+COPY presidio_anonymizer ./presidio_anonymizer
+
+USER 65532
+
+EXPOSE 3000
+
+# curl is unavailable (and would pull in a large TLS/auth dependency tree), so
+# the health check uses the Python standard library instead.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+    CMD ["/usr/bin/python3", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:3000/health',timeout=2).status==200 else 1)"]
+
+ENTRYPOINT ["/usr/bin/python3", "-m", "gunicorn", "app:create_app()"]

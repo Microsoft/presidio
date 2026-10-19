@@ -1,0 +1,71 @@
+name: Rebuild Images
+
+# Published images pin their base image by digest, so they never pick up
+# operating system security updates on their own. Rebuilding on a schedule
+# republishes the same versions on top of a freshly patched base, which is what
+# container compliance scanners expect ("redeploy the image", "update the
+# vulnerable image reference").
+#
+# Rebuilds do not change any application code: the workflow builds the current
+# state of main and republishes the `latest` and current version tags, plus an
+# immutable `<version>-<date>` tag so a specific rebuild can be pinned.
+
+on:
+  schedule:
+    # Every Monday at 05:00 UTC.
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  get-version:
+    name: Get Version Numbers
+    runs-on: ubuntu-slim
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+      image-version: ${{ steps.set-image-version.outputs.image-version }}
+      date-tag: ${{ steps.set-date-tag.outputs.date-tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+        with:
+          persist-credentials: false
+
+      - name: Extract main version
+        id: set-version
+        run: |
+          set -eu
+          ver=$(grep -m 1 version presidio-analyzer/pyproject.toml | tr -s ' ' | tr -d '"' | tr -d "'" | cut -d' ' -f3)
+          echo "version=$ver" >> $GITHUB_OUTPUT
+          echo "Main version: $ver"
+
+      - name: Extract image-redactor version
+        id: set-image-version
+        run: |
+          set -eu
+          imageVer=$(grep -m 1 version presidio-image-redactor/pyproject.toml | tr -s ' ' | tr -d '"' | tr -d "'" | cut -d' ' -f3)
+          echo "image-version=$imageVer" >> $GITHUB_OUTPUT
+          echo "Image-redactor version: $imageVer"
+
+      - name: Set date tag
+        id: set-date-tag
+        run: |
+          set -eu
+          dateTag=$(date -u +'%Y%m%d')
+          echo "date-tag=$dateTag" >> $GITHUB_OUTPUT
+          echo "Date tag: $dateTag"
+
+  rebuild-and-push-containers:
+    name: Rebuild and Push Container Images
+    needs: get-version
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/build-images.yml
+    with:
+      version: ${{ needs.get-version.outputs.version }}
+      image-version: ${{ needs.get-version.outputs.image-version }}
+      date-tag: ${{ needs.get-version.outputs.date-tag }}
+    secrets: inherit

@@ -41,6 +41,25 @@ If an existing deployment uses `mcr.microsoft.com/presidio-analyzer:latest`, tre
 
 Docker registries do not provide a portable way to redirect `docker pull mcr.microsoft.com/presidio-analyzer:latest` to GHCR or show a deprecation warning during `docker pull`. To reduce confusion, each GitHub release includes the GHCR image names, the GHCR images include OCI metadata labels pointing to the source repository, package page, and installation guide, and the MCR tags are documented as legacy references.
 
+### Image variants
+
+Each analyzer and anonymizer tag is published in two variants, built from `Dockerfile` and `Dockerfile.distroless` in the corresponding package directory:
+
+| Variant | Tag | Base image | Notes |
+| --- | --- | --- | --- |
+| Default | `latest`, `<release-version>` | `python:3.12-slim` / `python:3.14-slim` (Debian) | Includes a shell; configured with `PORT` and `WORKERS`. |
+| Distroless | `latest-distroless`, `<release-version>-distroless` | `mcr.microsoft.com/azurelinux/distroless/python:3.12-nonroot` | No shell, package manager or build tooling; configured with `GUNICORN_CMD_ARGS`; runs as UID 65532. |
+
+`presidio-image-redactor` is published in the default variant only, because it depends on the Tesseract OCR system packages.
+
+Neither runtime image contains `pip`, `uv`, `setuptools`, `wheel` or `curl`. Build tooling is confined to the builder stage of each multi-stage build, and the container health check uses the Python standard library instead of `curl`, which would otherwise pull in a large TLS and authentication dependency tree.
+
+### Scheduled rebuilds
+
+Base images are pinned by digest, so a published image never picks up operating system security updates on its own. The `Rebuild Images` workflow (`.github/workflows/rebuild-images.yml`) runs every Monday, and on demand via `workflow_dispatch`. It rebuilds the current state of `main` on a freshly patched base and republishes the `latest` and current version tags, plus an immutable `<version>-<date>` tag, for example `2.2.364-20260909-distroless`, so a specific rebuild can be pinned or rolled back to.
+
+Rebuilds publish no new application code: only the base image layers and any dependency wheels resolved at build time change. Both the release workflow and the rebuild workflow delegate to the reusable `.github/workflows/build-images.yml` workflow, so the two paths cannot drift apart.
+
 ## PyPI publishing with OIDC
 
 The release workflow uses OIDC (OpenID Connect) trusted publishing to PyPI, which eliminates the need to manage PyPI API tokens. This requires:

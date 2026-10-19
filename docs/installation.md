@@ -132,6 +132,64 @@ docker run -d -p 5003:3000 ghcr.io/data-privacy-stack/presidio-image-redactor:la
 Once the services are running, their APIs are available.
 API reference and example calls can be found [here](api.md).
 
+### Hardened distroless images
+
+Both `presidio-analyzer` and `presidio-anonymizer` are also published as
+distroless variants, built on
+[Microsoft Azure Linux distroless](https://github.com/microsoft/azurelinux).
+They are functionally identical to the default images, but ship no shell, no
+package manager and no build tooling, which removes almost the entire operating
+system attack surface.
+
+Use them if your organization runs container vulnerability or compliance
+scanning (for example Microsoft Defender for Cloud or S360) against the Presidio
+images.
+
+```sh
+docker pull ghcr.io/data-privacy-stack/presidio-analyzer:latest-distroless
+docker pull ghcr.io/data-privacy-stack/presidio-anonymizer:latest-distroless
+
+docker run -d -p 5002:3000 ghcr.io/data-privacy-stack/presidio-analyzer:latest-distroless
+docker run -d -p 5001:3000 ghcr.io/data-privacy-stack/presidio-anonymizer:latest-distroless
+```
+
+The distroless variants differ from the default images in three ways:
+
+* **No shell.** The `PORT` and `WORKERS` environment variables are not used,
+  because there is no shell to expand them. Gunicorn is started directly, and is
+  configured through `GUNICORN_CMD_ARGS`, which defaults to
+  `--workers=1 --bind=0.0.0.0:3000`:
+
+    ```sh
+    docker run -d -p 5001:3000 \
+      -e GUNICORN_CMD_ARGS="--workers=4 --bind=0.0.0.0:3000 --timeout=120" \
+      ghcr.io/data-privacy-stack/presidio-anonymizer:latest-distroless
+    ```
+
+    For the same reason, `docker exec ... sh` is not available. Use the default
+    images if you need to run commands inside the container.
+
+* **Python 3.12.** Azure Linux distroless publishes Python 3.12 only. This
+  matches the default analyzer image; the default anonymizer image runs Python
+  3.14. Both packages support Python 3.10 through 3.14, so the runtime version
+  does not change behavior.
+
+* **Runs as UID 65532**, the base image's `nonroot` user, rather than UID 1001.
+  Adjust any volume permissions or Kubernetes `runAsUser` settings accordingly.
+
+There is no distroless variant of `presidio-image-redactor`: it depends on the
+Tesseract OCR system packages, which a distroless base image cannot provide.
+
+### Keeping images patched
+
+Images pin their base image by digest, so a published image never picks up
+operating system security updates on its own. The
+[Rebuild Images](https://github.com/data-privacy-stack/presidio/actions/workflows/rebuild-images.yml)
+workflow rebuilds and republishes every image weekly on top of a freshly patched
+base, without changing any application code. Each rebuild also publishes an
+immutable `<version>-<date>` tag, for example `2.2.364-20260909-distroless`, so
+you can pin an exact rebuild and roll back to it if needed.
+
 ## Install from source
 
 To install Presidio from source, first clone the repo:
