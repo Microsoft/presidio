@@ -274,16 +274,27 @@ class AnonymizerEngine(EngineBase):
         self, text: str, analyzer_results: List[RecognizerResult]
     ) -> List[RecognizerResult]:
         """Merge adjacent entities of the same type separated by whitespace."""
+        if not analyzer_results:
+            return []
+
+        # Sort entities by start position to ensure proper merging
+        sorted_results = sorted(analyzer_results, key=lambda x: x.start)
+        
         merged_results = []
-        prev_result = None
-        for result in analyzer_results:
-            if prev_result is not None:
+        for result in sorted_results:
+            if merged_results:
+                prev_result = merged_results[-1]
                 if prev_result.entity_type == result.entity_type:
                     if re.search(r"^( )+$", text[prev_result.end:result.start]):
-                        merged_results.remove(prev_result)
+                        # Merge: extend the previous entity
                         result.start = prev_result.start
-            merged_results.append(result)
-            prev_result = result
+                        merged_results[-1] = result
+                    else:
+                        merged_results.append(result)
+                else:
+                    merged_results.append(result)
+            else:
+                merged_results.append(result)
         return merged_results
 
     def get_anonymizers(self) -> List[str]:
