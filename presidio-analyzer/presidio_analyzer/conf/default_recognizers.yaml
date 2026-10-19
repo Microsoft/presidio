@@ -335,6 +335,13 @@ recognizers:
     enabled: false
     country_code: fi
 
+  - name: KrBankAccountRecognizer
+    supported_languages:
+    - ko
+    type: predefined
+    enabled: false
+    country_code: kr
+
   - name: KrBrnRecognizer
     supported_languages: 
     - ko
