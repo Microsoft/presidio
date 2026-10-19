@@ -191,6 +191,34 @@ def test_given_several_results_then_we_filter_them_and_get_correct_mocked_result
             )
         ),
         (
+            "My name is David \nJones",
+            [
+                RecognizerResult(start=11, end=16, score=0.8, entity_type="PERSON"),
+                RecognizerResult(start=18, end=23, score=0.8, entity_type="PERSON"),
+            ],
+            EngineResult(
+                text="My name is BIP \nBIP",
+                items=[
+                    OperatorResult(11, 14, "PERSON", "BIP", "replace"),
+                    OperatorResult(16, 19, "PERSON", "BIP", "replace"),
+                ]
+            )
+        ),
+        (
+            "My name is David  \nJones",
+            [
+                RecognizerResult(start=11, end=16, score=0.8, entity_type="PERSON"),
+                RecognizerResult(start=19, end=24, score=0.8, entity_type="PERSON"),
+            ],
+            EngineResult(
+                text="My name is BIP  \nBIP",
+                items=[
+                    OperatorResult(11, 14, "PERSON", "BIP", "replace"),
+                    OperatorResult(17, 20, "PERSON", "BIP", "replace"),
+                ]
+            )
+        ),
+        (
             "My name is Jones, David",
             [
                 RecognizerResult(start=11, end=16, score=0.8, entity_type="PERSON"),
