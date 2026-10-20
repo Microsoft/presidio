@@ -2,7 +2,11 @@ import collections
 from typing import Any, Dict, Iterable, List, Optional, Union
 
 from presidio_anonymizer import AnonymizerEngine
-from presidio_anonymizer.entities import DictRecognizerResult, RecognizerResult
+from presidio_anonymizer.entities import (
+    DictRecognizerResult,
+    InvalidParamError,
+    RecognizerResult,
+)
 
 
 class BatchAnonymizerEngine:
@@ -30,10 +34,17 @@ class BatchAnonymizerEngine:
         :param recognizer_results_list: A list of lists of RecognizerResult,
         the output of the AnalyzerEngine on each text in the list.
         :param kwargs: Additional kwargs for the `AnonymizerEngine.anonymize` method
+        :raises InvalidParamError: If the length of texts does not match the
+            length of recognizer_results_list.
         """
         return_list = []
         if not recognizer_results_list:
             recognizer_results_list = [[] for _ in range(len(texts))]
+        elif len(texts) != len(recognizer_results_list):
+            raise InvalidParamError(
+                f"Invalid input, the number of texts ({len(texts)}) must match the "
+                f"number of recognizer results ({len(recognizer_results_list)})."
+            )
         for text, recognizer_results in zip(texts, recognizer_results_list):
             if type(text) in (str, bool, int, float):
                 res = self.anonymizer_engine.anonymize(

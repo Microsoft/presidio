@@ -2,9 +2,10 @@ import pytest
 
 from presidio_anonymizer import BatchAnonymizerEngine
 from presidio_anonymizer.entities import (
-    RecognizerResult,
     DictRecognizerResult,
+    InvalidParamError,
     OperatorConfig,
+    RecognizerResult,
 )
 
 
@@ -134,3 +135,45 @@ def test_given_custom_anonymizer_we_anonymize_dict_correctly(engine, analyzer_re
     assert anonymize_results == {
         "name": ["<ENTITY: John>", "<ENTITY: Jill>", "<ENTITY: Jack>"]
     }
+
+
+def test_given_fewer_recognizer_results_anonymize_list_raises_invalid_param_error(engine):
+    texts = ["John", "Jill"]
+    recognizer_results_list = [[RecognizerResult("PERSON", 0, 4, 0.85)]]
+    with pytest.raises(
+        InvalidParamError,
+        match=r"Invalid input, the number of texts \(2\) must match the number of recognizer results \(1\)\.",
+    ):
+        engine.anonymize_list(
+            texts=texts, recognizer_results_list=recognizer_results_list
+        )
+
+
+def test_given_more_recognizer_results_anonymize_list_raises_invalid_param_error(engine):
+    texts = ["John"]
+    recognizer_results_list = [
+        [RecognizerResult("PERSON", 0, 4, 0.85)],
+        [RecognizerResult("PERSON", 0, 4, 0.85)],
+    ]
+    with pytest.raises(
+        InvalidParamError,
+        match=r"Invalid input, the number of texts \(1\) must match the number of recognizer results \(2\)\.",
+    ):
+        engine.anonymize_list(
+            texts=texts, recognizer_results_list=recognizer_results_list
+        )
+
+
+def test_given_mismatched_lengths_in_dict_raises_invalid_param_error(engine):
+    analyzer_results = [
+        DictRecognizerResult(
+            key="name",
+            value=["John", "Jill", "Jack"],
+            recognizer_results=[[RecognizerResult("PERSON", 0, 4, 0.85)]],
+        )
+    ]
+    with pytest.raises(
+        InvalidParamError,
+        match=r"Invalid input, the number of texts \(3\) must match the number of recognizer results \(1\)\.",
+    ):
+        engine.anonymize_dict(analyzer_results)
