@@ -81,7 +81,8 @@ class BatchAnalyzerEngine:
 
         :param input_dict: The input dictionary for analysis
         :param language: Input language
-        :param keys_to_skip: Keys to ignore during analysis
+        :param keys_to_skip: Keys to ignore during analysis. A nested key is
+        given as its dot-separated path from the top level, e.g. "key_a.key_a1"
         :param batch_size: Batch size to process in a single iteration
         :param n_process: Number of processors to use. Defaults to `1`
 
@@ -153,7 +154,5 @@ class BatchAnalyzerEngine:
 
     @staticmethod
     def _get_nested_keys_to_skip(key, keys_to_skip):
-        new_keys_to_skip = [
-            k.replace(f"{key}.", "") for k in keys_to_skip if k.startswith(key)
-        ]
-        return new_keys_to_skip
+        prefix = f"{key}."
+        return [k.removeprefix(prefix) for k in keys_to_skip if k.startswith(prefix)]
