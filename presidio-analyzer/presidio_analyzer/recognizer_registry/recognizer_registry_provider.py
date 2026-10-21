@@ -67,12 +67,14 @@ class RecognizerRegistryProvider:
     def create_recognizer_registry(self) -> RecognizerRegistry:
         """Create a recognizer registry according to configuration loaded previously."""
         supported_languages = self.configuration.get("supported_languages")
+        supported_countries = self.configuration.get("supported_countries")
         global_regex_flags = self.configuration.get("global_regex_flags")
         recognizers_conf = self.configuration.get("recognizers")
         recognizers = RecognizerListLoader.get(
             recognizers_conf,
             supported_languages,
             global_regex_flags,
+            supported_countries=supported_countries,
         )
 
         recognizers = list(recognizers)

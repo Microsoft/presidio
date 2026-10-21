@@ -451,3 +451,93 @@ def test_text_chunker_config_rejects_character_params_for_tokenizer():
 
     with pytest.raises(ValidationError, match="chunker_type='tokenizer'"):
         TextChunkerConfig(chunker_type="tokenizer", chunk_size=300)
+
+
+# ---------------------------------------------------------------------------
+# Top-level ``supported_countries`` in a recognizer registry configuration
+# ---------------------------------------------------------------------------
+# docs/analyzer/filtering_by_country.md documents ``supported_countries`` as the
+# YAML equivalent of ``load_predefined_recognizers(countries=...)``, and
+# presidio_analyzer/conf/default_recognizers.yaml instructs users to uncomment
+# it. Both routes have to actually reach ``RecognizerListLoader.get``.
+
+COUNTRY_FILTER_RECOGNIZERS = [
+    {"name": "UsSsnRecognizer", "type": "predefined", "supported_languages": ["en"]},
+    {"name": "UkNinoRecognizer", "type": "predefined", "supported_languages": ["en"]},
+    {"name": "CreditCardRecognizer", "type": "predefined", "supported_languages": ["en"]},
+]
+
+
+def load_registry_names(**overrides):
+    """Build a registry through the provider, returning (names, error message)."""
+    configuration = {
+        "supported_languages": ["en"],
+        "global_regex_flags": 26,
+        "recognizers": COUNTRY_FILTER_RECOGNIZERS,
+        **overrides,
+    }
+    try:
+        registry = RecognizerRegistryProvider(
+            registry_configuration=configuration
+        ).create_recognizer_registry()
+    except ValueError as exc:
+        return None, str(exc)
+    return sorted({recognizer.name for recognizer in registry.recognizers}), None
+
+
+def test_yaml_supported_countries_null_loads_everything():
+    """An explicit ``supported_countries:`` with no value is None, not a filter.
+
+    Uncommenting only the ``supported_countries:`` line in a registry YAML
+    leaves the key present with a null value, so the registry must still load
+    and nothing may be filtered out.
+    """
+    names, error = load_registry_names(supported_countries=None)
+    assert error is None, f"a null supported_countries must load, got: {error}"
+    assert names == ["CreditCardRecognizer", "UkNinoRecognizer", "UsSsnRecognizer"]
+
+
+def test_yaml_supported_countries_loads_and_filters_recognizers():
+    """``supported_countries`` in YAML narrows the loaded country-specific set."""
+    unfiltered, error = load_registry_names()
+    assert error is None
+    assert unfiltered == ["CreditCardRecognizer", "UkNinoRecognizer", "UsSsnRecognizer"]
+
+    names, error = load_registry_names(supported_countries=["us"])
+    assert error is None, (
+        "supported_countries is documented YAML input and must load, got: "
+        f"{error}"
+    )
+    assert "UsSsnRecognizer" in names
+    assert "UkNinoRecognizer" not in names, (
+        "country-specific recognizers outside supported_countries must be dropped"
+    )
+    assert "CreditCardRecognizer" in names, (
+        "locale-agnostic recognizers must always be kept"
+    )
+
+
+def test_yaml_supported_countries_is_case_insensitive_and_blank_list_is_explicit():
+    """Codes are case-insensitive; ``[]`` keeps only locale-agnostic recognizers."""
+    names, error = load_registry_names(supported_countries=["  US "])
+    assert error is None
+    assert names == ["CreditCardRecognizer", "UsSsnRecognizer"]
+
+    names, error = load_registry_names(supported_countries=[])
+    assert error is None, "an explicit empty list is documented, not a schema error"
+    assert names == ["CreditCardRecognizer"]
+
+
+def test_recognizer_registry_config_rejects_invalid_supported_countries():
+    """Blank country codes are rejected at parse time, not silently ignored."""
+    from pydantic import ValidationError
+    from presidio_analyzer.input_validation.yaml_recognizer_models import (
+        RecognizerRegistryConfig,
+    )
+
+    with pytest.raises(ValidationError, match="non-empty"):
+        RecognizerRegistryConfig(
+            supported_languages=["en"],
+            recognizers=COUNTRY_FILTER_RECOGNIZERS,
+            supported_countries=["  "],
+        )

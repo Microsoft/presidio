@@ -464,6 +464,15 @@ class RecognizerRegistryConfig(BaseModel):
     supported_languages: Optional[List[str]] = Field(
         default=None, description="List of supported languages"
     )
+    supported_countries: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Optional list of ISO 3166-1 alpha-2 country codes "
+            "(case-insensitive). Mirrors 'supported_languages': when set, "
+            "country-specific recognizers outside this list are not loaded, "
+            "while locale-agnostic recognizers are always loaded."
+        ),
+    )
     global_regex_flags: int = Field(default=26, description="Global regex flags")
     recognizers: List[
         Union[
@@ -493,6 +502,24 @@ class RecognizerRegistryConfig(BaseModel):
 
         validate_language_codes(languages)
         return languages
+
+    @field_validator("supported_countries")
+    @classmethod
+    def validate_country_codes(
+        cls, countries: Optional[List[str]]
+    ) -> Optional[List[str]]:
+        """Validate and normalize country codes to lower-case ISO 3166-1 codes.
+
+        Reuses ``RecognizerListLoader._normalize_countries`` so the YAML
+        path rejects the same input the Python ``countries=`` argument rejects
+        (bare strings, non-string entries, blank codes) instead of letting the
+        mistake surface later as an empty registry.
+        """
+        if countries is None:
+            return None
+
+        normalized = RecognizerListLoader._normalize_countries(countries)
+        return sorted(normalized)
 
     @model_validator(mode="after")
     def validate_languages_for_custom_recognizers(self):
