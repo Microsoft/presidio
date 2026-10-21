@@ -1,5 +1,6 @@
 import logging
 from abc import abstractmethod
+from itertools import groupby
 from typing import TYPE_CHECKING, ClassVar, Dict, List, Optional, Tuple
 
 from presidio_analyzer import RecognizerResult
@@ -275,36 +276,57 @@ class EntityRecognizer:
     @staticmethod
     def remove_duplicates(results: List[RecognizerResult]) -> List[RecognizerResult]:
         """
-        Remove duplicate results.
+        Remove duplicate, zero-score, and contained results.
 
-        Remove duplicates in case the two results
-        have identical start and ends and types.
+        Results with a score of zero are removed. A result is also removed if another
+        result of the same type fully contains it and has an equal or higher score.
         :param results: List[RecognizerResult]
         :return: List[RecognizerResult]
         """
         results = list(set(results))
-        results = sorted(results, key=lambda x: (-x.score, x.start, -(x.end - x.start)))
+        results = sorted(
+            results,
+            key=lambda x: (
+                str(x.entity_type),
+                x.start,
+                -(x.end - x.start),
+                -x.score,
+            ),
+        )
         filtered_results = []
 
-        for result in results:
-            if result.score == 0:
-                continue
+        for _, entity_results in groupby(
+            results, key=lambda result: result.entity_type
+        ):
+            active_results = []
 
-            to_keep = result not in filtered_results  # equals based comparison
-            if to_keep:
-                for filtered in filtered_results:
+            for result in entity_results:
+                if result.score == 0:
+                    continue
+
+                # Only overlapping results can contain the current result.
+                active_results = [
+                    filtered
+                    for filtered in active_results
+                    if filtered.end >= result.start
+                ]
+
+                to_keep = True
+                for filtered in active_results:
                     # If result is contained in one of the other results
-                    if (
-                        result.contained_in(filtered)
-                        and result.entity_type == filtered.entity_type
-                    ):
+                    if result.contained_in(filtered) and result.score <= filtered.score:
                         to_keep = False
                         break
 
-            if to_keep:
-                filtered_results.append(result)
+                if to_keep:
+                    filtered_results.append(result)
+                    active_results.append(result)
 
-        return filtered_results
+        # Restore the existing score-first result order.
+        return sorted(
+            filtered_results,
+            key=lambda x: (-x.score, x.start, -(x.end - x.start)),
+        )
 
     @staticmethod
     def sanitize_value(text: str, replacement_pairs: List[Tuple[str, str]]) -> str:
