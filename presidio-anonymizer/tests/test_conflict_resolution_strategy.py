@@ -200,3 +200,78 @@ def test_when_remove_intersections_conflict_selected_then_all_conflicts_handled(
 
     assert result.text == expected_result.text
     assert sorted(result.items) == sorted(expected_result.items)
+
+
+def test_when_same_type_results_intersect_in_a_chain_then_one_result_remains():
+    text = "aaaaaaaaaaaa tail"
+    results = [
+        RecognizerResult("PERSON", 5, 9, 0.4),
+        RecognizerResult("PERSON", 0, 6, 0.9),
+        RecognizerResult("PERSON", 8, 12, 0.5),
+    ]
+
+    result = AnonymizerEngine().anonymize(text, results)
+
+    assert result.text == "<PERSON> tail"
+    assert [(item.start, item.end) for item in result.items] == [(0, 8)]
+
+
+def test_when_same_type_results_touch_then_both_remain():
+    text = "aaaaabbbb"
+    results = [
+        RecognizerResult("PERSON", 0, 5, 0.9),
+        RecognizerResult("PERSON", 5, 9, 0.9),
+    ]
+
+    result = AnonymizerEngine().anonymize(text, results)
+
+    assert result.text == "<PERSON><PERSON>"
+
+
+def test_when_result_is_contained_in_another_type_then_it_is_dropped():
+    text = "aaaaaaaaaa"
+    results = [
+        RecognizerResult("LOCATION", 2, 5, 0.9),
+        RecognizerResult("PERSON", 0, 10, 0.3),
+    ]
+
+    result = AnonymizerEngine().anonymize(text, results)
+
+    assert result.text == "<PERSON>"
+
+
+def test_when_results_have_equal_indices_then_the_higher_score_remains():
+    text = "aaaaa"
+    results = [
+        RecognizerResult("PERSON", 0, 5, 0.9),
+        RecognizerResult("LOCATION", 0, 5, 0.4),
+    ]
+
+    result = AnonymizerEngine().anonymize(text, results)
+
+    assert result.text == "<PERSON>"
+
+
+def test_when_results_have_equal_indices_and_scores_then_the_last_one_remains():
+    text = "aaaaa"
+    results = [
+        RecognizerResult("LOCATION", 0, 5, 0.8),
+        RecognizerResult("PERSON", 0, 5, 0.8),
+    ]
+
+    result = AnonymizerEngine().anonymize(text, results)
+
+    assert result.text == "<PERSON>"
+
+
+def test_when_many_results_do_not_overlap_then_all_are_anonymized():
+    count = 20000
+    text = "x" * (count * 10)
+    results = [
+        RecognizerResult(f"E{index}", index * 10, index * 10 + 5, 1.0)
+        for index in range(count)
+    ]
+
+    result = AnonymizerEngine().anonymize(text, results)
+
+    assert len(result.items) == count
