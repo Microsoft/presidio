@@ -115,3 +115,40 @@ def test_entity_not_returned_if_not_in_supported_entities(mock_nlp_artifacts):
         text="text", nlp_artifacts=mock_nlp_artifacts, entities=["DATE_TIME"]
     )
     assert len(res) == 0
+
+
+def test_default_explanation_is_used_when_given(mock_nlp_artifacts):
+    """A caller-supplied default_explanation must reach the results.
+
+    Regression test: the constructor stored the value in
+    ``self.default_explanation`` while ``analyze`` formatted the class constant
+    ``self.DEFAULT_EXPLANATION``, so the argument was silently discarded.
+    """
+    spacy_recognizer = SpacyRecognizer(
+        supported_entities=["PERSON"], default_explanation="custom {} reason"
+    )
+
+    res = spacy_recognizer.analyze(
+        text="My name is Mitchell", nlp_artifacts=mock_nlp_artifacts, entities=["PERSON"]
+    )
+
+    assert len(res) == 1
+    assert (
+        res[0].analysis_explanation.textual_explanation
+        == "custom PERSON reason"
+    )
+
+
+def test_default_explanation_falls_back_to_the_class_default(mock_nlp_artifacts):
+    """Without the argument, the built-in wording must still be produced."""
+    spacy_recognizer = SpacyRecognizer(supported_entities=["PERSON"])
+
+    res = spacy_recognizer.analyze(
+        text="My name is Mitchell", nlp_artifacts=mock_nlp_artifacts, entities=["PERSON"]
+    )
+
+    assert len(res) == 1
+    assert (
+        res[0].analysis_explanation.textual_explanation
+        == SpacyRecognizer.DEFAULT_EXPLANATION.format("PERSON")
+    )
