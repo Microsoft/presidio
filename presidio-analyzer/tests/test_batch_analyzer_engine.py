@@ -240,6 +240,44 @@ def test_analyze_dict_nested_with_skipping(
     assert num_results == results_length
 
 
+def _results_by_path(dict_results, parent=""):
+    paths = {}
+    for result in dict_results:
+        path = f"{parent}{result.key}"
+        if isinstance(result.value, dict):
+            paths.update(_results_by_path(result.recognizer_results, f"{path}."))
+        else:
+            paths[path] = len(list(result.recognizer_results))
+    return paths
+
+
+@pytest.mark.parametrize(
+    ["nested_dict", "keys", "expected"],
+    [
+        # A top-level key that starts with a parent key's name skips only itself.
+        (
+            {"user": {"username": "212-121-1424"}, "username": "212-121-1424"},
+            ["username"],
+            {"user.username": 1, "username": 0},
+        ),
+        # A key name that repeats along the path is removed only as the prefix.
+        (
+            {"a": {"x": {"a": {"y": "212-121-1424"}, "y": "212-121-1424"}}},
+            ["a.x.a.y"],
+            {"a.x.a.y": 0, "a.x.y": 1},
+        ),
+    ],
+)
+def test_analyze_dict_nested_skips_only_the_given_paths(
+    nested_dict, keys, expected, batch_analyzer_engine_simple
+):
+    results = batch_analyzer_engine_simple.analyze_dict(
+        input_dict=nested_dict, language="en", keys_to_skip=keys
+    )
+
+    assert _results_by_path(results) == expected
+
+
 def test_analyze_list_non_primitive_type_raises_error(batch_analyzer_engine_simple):
     input_dict = {"key": ["1", "2", {"inner_key": "inner_value"}]}
 
