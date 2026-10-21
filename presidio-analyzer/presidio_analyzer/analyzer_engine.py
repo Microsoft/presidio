@@ -208,6 +208,12 @@ class AnalyzerEngine:
         :param nlp_artifacts: precomputed NlpArtifacts
         :return: an array of the found entities in the text
 
+        Unsupported entities are ignored with a logged warning, while supported
+        entities are analyzed. Ignoring unsupported entities is deprecated and will
+        raise an error in a future version. Call
+        `AnalyzerEngine.get_supported_entities(language)` to find supported entities,
+        or provide matching ad-hoc recognizers.
+
         :Example:
 
         ```python
