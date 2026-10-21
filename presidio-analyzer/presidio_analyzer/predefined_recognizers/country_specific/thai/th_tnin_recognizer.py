@@ -14,6 +14,11 @@ class ThTninRecognizer(PatternRecognizer):
     - N1-N12 are the main digits
     - N13 is a check digit calculated using the preceding 12 digits
 
+    The ID card prints the number grouped as N1 N2-N5 N6-N10 N11-N12 N13
+    (``1 2345 67890 12 3``), and it is often written with dashes
+    (``1-2345-67890-12-3``). Both groupings are matched, with one separator
+    used throughout; separators are removed before validation.
+
     Validation rules:
     - Must be exactly 13 digits
     - First digit (N1) cannot be 0
@@ -46,12 +51,23 @@ class ThTninRecognizer(PatternRecognizer):
 
     COUNTRY_CODE = "th"
 
+    # N2N3: province code, excluding unassigned combinations (see docstring)
+    _PROVINCE = r"(?:[134][0-9]|2[0-7]|5[0-8]|[67][01234567]|[89][0123456])"
+
     PATTERNS = [
         Pattern(
             "TNIN (Medium)",
-            r"\b[1-9](?:[134][0-9]|2[0-7]|5[0-8]|[67][01234567]|[89][0123456])\d{10}\b",
+            r"\b[1-9]" + _PROVINCE + r"\d{10}\b",
             0.5,
-        )
+        ),
+        Pattern(
+            "TNIN grouped (Medium)",
+            # Not part of a longer run of digits grouped with the same separator
+            r"(?<!\d)(?:(?<!\d )(?=\d )|(?<!\d-)(?=\d-))[1-9](?P<sep>[ -])"
+            + _PROVINCE
+            + r"\d{2}(?P=sep)\d{5}(?P=sep)\d{2}(?P=sep)\d(?!\d)(?!(?P=sep)\d)",
+            0.5,
+        ),
     ]
 
     CONTEXT = [
@@ -72,7 +88,11 @@ class ThTninRecognizer(PatternRecognizer):
         replacement_pairs: Optional[List[Tuple[str, str]]] = None,
         name: Optional[str] = None,
     ):
-        self.replacement_pairs = replacement_pairs if replacement_pairs else []
+        self.replacement_pairs = (
+            replacement_pairs
+            if replacement_pairs is not None
+            else [("-", ""), (" ", "")]
+        )
 
         patterns = patterns if patterns else self.PATTERNS
         context = context if context else self.CONTEXT

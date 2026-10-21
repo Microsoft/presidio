@@ -1,9 +1,14 @@
 """Tests for Thai National ID (TNIN) recognizer."""
 
-import pytest
-from presidio_analyzer.predefined_recognizers import ThTninRecognizer
+from pathlib import Path
 
-from tests import assert_result_within_score_range
+import presidio_analyzer
+import pytest
+import yaml
+from presidio_analyzer.predefined_recognizers import ThTninRecognizer
+from presidio_analyzer.recognizer_registry import RecognizerRegistryProvider
+
+from tests import assert_result, assert_result_within_score_range
 
 
 @pytest.fixture(scope="module")
@@ -168,3 +173,67 @@ def test_supported_entity(recognizer):
 def test_supported_language(recognizer):
     """Test that supported language is correctly set."""
     assert recognizer.supported_language == "th"
+
+
+@pytest.mark.parametrize(
+    "text, expected_span",
+    [
+        # Grouped 1-4-5-2-1 as printed on the ID card (1103702071811)
+        ("เลขประจำตัวประชาชน 1 1037 02071 81 1", (19, 36)),
+        # Dashed, as written on forms
+        ("เลขประจำตัวประชาชน 1-1037-02071-81-1", (19, 36)),
+        ("Thai ID Number: 3-1010-00123-45-0 issued", (16, 33)),
+        # Thai text runs straight into the number
+        ("เลขประจำตัวประชาชน1-1037-02071-81-1", (18, 35)),
+        ("1 2201 00000 00 9", (0, 17)),
+        # An unrelated number next to it, with the other separator
+        ("1-1037-02071-81-1 2026", (0, 17)),
+        ("No. 1 1-1037-02071-81-1", (6, 23)),
+    ],
+)
+def test_when_tnin_is_grouped_then_found_and_validated(
+    text, expected_span, recognizer, entities, max_score
+):
+    """A TNIN written in its card grouping is detected and passes the checksum."""
+    results = recognizer.analyze(text, entities)
+
+    assert len(results) == 1
+    assert_result(results[0], "TH_TNIN", *expected_span, max_score)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1 1037 02071 81 2",  # grouped, wrong check digit
+        "1-1037 02071-81-1",  # mixed separators
+        "1 1037 0207181 1",  # wrong grouping
+        "11 1037 02071 81 1",  # longer leading run
+        "1 1037 02071 81 1 5",  # longer trailing run
+        "1-1037-02071-81-1-5",  # longer trailing run, dashed
+        "7-1-1037-02071-81-1",  # longer leading run, dashed
+        "1 2837 02071 81 1",  # forbidden province code 28
+    ],
+)
+def test_when_grouped_tnin_lookalike_then_not_found(text, recognizer, entities):
+    """Grouped lookalikes stay undetected."""
+    assert recognizer.analyze(text, entities) == []
+
+
+def test_grouped_tnin_detected_when_enabled_in_yaml(max_score):
+    """The grouped form is detected through the registry configuration path."""
+    conf = Path(presidio_analyzer.__file__).parent / "conf" / "default_recognizers.yaml"
+    recognizers = yaml.safe_load(conf.read_text(encoding="utf-8"))["recognizers"]
+    entry = next(r for r in recognizers if r.get("name") == "ThTninRecognizer")
+
+    registry = RecognizerRegistryProvider(
+        registry_configuration={
+            "supported_languages": ["th"],
+            "recognizers": [dict(entry, enabled=True)],
+        }
+    ).create_recognizer_registry()
+    results = registry.recognizers[0].analyze(
+        "เลขประจำตัวประชาชน 1-1037-02071-81-1", ["TH_TNIN"]
+    )
+
+    assert len(results) == 1
+    assert_result(results[0], "TH_TNIN", 19, 36, max_score)
