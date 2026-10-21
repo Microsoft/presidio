@@ -63,7 +63,7 @@ def validate_type(parameter_value, parameter_name, parameter_type):
     Otherwise, raise the appropriate InvalidParamException with the parameter_name
     as content.
     """
-    if parameter_value and not isinstance(parameter_value, parameter_type):
+    if parameter_value is not None and not isinstance(parameter_value, parameter_type):
         message = _get_bad_typed_parameter_error_message(
             parameter_name,
             expected_type=parameter_type,
