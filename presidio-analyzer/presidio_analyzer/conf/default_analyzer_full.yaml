@@ -111,6 +111,10 @@ recognizer_registry:
       type: predefined
       enabled: false
 
+    - name: PkCnicRecognizer
+      type: predefined
+      enabled: false
+
     - name: InAadhaarRecognizer
       supported_languages:
       - en

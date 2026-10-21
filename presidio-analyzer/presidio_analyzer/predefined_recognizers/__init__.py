@@ -76,6 +76,9 @@ from .country_specific.nigeria.ng_vehicle_registration_recognizer import (
     NgVehicleRegistrationRecognizer,
 )
 
+# Pakistan recognizers
+from .country_specific.pakistan.pk_cnic_recognizer import PkCnicRecognizer
+
 # Philippines recognizers
 from .country_specific.philippines.ph_passport_recognizer import PhPassportRecognizer
 from .country_specific.philippines.ph_tin_recognizer import PhTinRecognizer
@@ -270,6 +273,7 @@ __all__ = [
     "HuggingFaceNerRecognizer",
     "PhTinRecognizer",
     "PlPeselRecognizer",
+    "PkCnicRecognizer",
     "PhUmidRecognizer",
     "AzureAILanguageRecognizer",
     "InAadhaarRecognizer",
