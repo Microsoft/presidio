@@ -133,6 +133,11 @@ For more information, refer to the [adding new recognizers documentation](analyz
 | PH_PASSPORT | Philippine Passport Number. Alphanumeric format, usually 1 letter followed by 7 digits and 1 letter, or 2 letters followed by 7 digits (e.g., P1234567A, EB1234567). | Pattern match and context |
 | PH_TIN     | Philippines Taxpayer Identification Number (TIN). 9 or 12-digit number issued by the Bureau of Internal Revenue (BIR). | Pattern match, context, and checksum |
 
+### Pakistan
+| FieldType  | Description                                                                                             | Detection Method                         |
+|------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
+| PK_CNIC    | The Pakistani Computerised National Identity Card (CNIC) number is a unique 13 digit identifier issued by the National Database and Registration Authority (NADRA). The first digit is a province or region code from 1 to 7. | Pattern match and context |
+
 ### Canada
 
 |FieldType|Description|Detection Method|
