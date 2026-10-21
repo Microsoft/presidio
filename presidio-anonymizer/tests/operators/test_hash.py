@@ -1,7 +1,12 @@
 import pytest
 
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import (
+    InvalidParamError,
+    OperatorConfig,
+    RecognizerResult,
+)
 from presidio_anonymizer.operators import Hash
-from presidio_anonymizer.entities import InvalidParamError
 
 
 @pytest.mark.parametrize(
@@ -261,6 +266,48 @@ def test_when_salt_minimum_length_then_accepted():
     result = Hash().operate(text=text, params=params)
     assert result is not None
     assert len(result) == 64  # SHA256 default produces 64 hex characters
+
+
+@pytest.mark.parametrize(
+    "bad_salt",
+    [
+        1234567890123456,  # a number in a JSON request body
+        1.5,
+        True,
+        ["0123456789abcdef"],  # array, long enough to pass a bare len() check
+        {"salt": "0123456789abcdef"},  # object, same as above
+    ],
+)
+def test_when_salt_is_not_a_string_or_bytes_then_validate_raises(bad_salt):
+    """A wrongly typed salt must be rejected by validate(), not crash operate()."""
+    with pytest.raises(InvalidParamError, match="Salt must be a string or bytes"):
+        Hash().validate(params={"salt": bad_salt})
+
+
+def test_when_salt_is_missing_or_none_then_random_salt_is_used():
+    """An omitted or null salt keeps hashing non-deterministic."""
+    with_none_salt = [
+        Hash().operate(text="data", params={"salt": None}) for _ in range(5)
+    ]
+    without_salt = [Hash().operate(text="data", params={}) for _ in range(5)]
+    assert len(set(with_none_salt + without_salt)) > 1
+
+
+def test_when_salt_type_is_invalid_then_anonymize_raises_invalid_param_error():
+    """The engine validates operators, so a bad salt never reaches operate()."""
+    engine = AnonymizerEngine()
+    with pytest.raises(InvalidParamError, match="Invalid salt type 'int'"):
+        engine.anonymize(
+            text="Call 555-555-5555",
+            analyzer_results=[
+                RecognizerResult(
+                    entity_type="PHONE_NUMBER", start=5, end=16, score=0.9
+                )
+            ],
+            operators={
+                "DEFAULT": OperatorConfig("hash", {"salt": 1234567890123456})
+            },
+        )
 
 
 def _get_default_hash_parameters():
