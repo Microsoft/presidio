@@ -70,14 +70,14 @@ class PhoneRecognizer(LocalRecognizer):
             ):
                 try:
                     parsed_number = phonenumbers.parse(text[match.start : match.end])
-                    region = phonenumbers.region_code_for_number(parsed_number)
-                    results += [
-                        self._get_recognizer_result(match, text, region, nlp_artifacts)
-                    ]
+                    matched_region = phonenumbers.region_code_for_number(parsed_number)
                 except NumberParseException:
-                    results += [
-                        self._get_recognizer_result(match, text, region, nlp_artifacts)
-                    ]
+                    matched_region = region
+                results += [
+                    self._get_recognizer_result(
+                        match, text, matched_region, nlp_artifacts
+                    )
+                ]
 
         return EntityRecognizer.remove_duplicates(results)
 

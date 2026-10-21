@@ -123,6 +123,14 @@ def test_when_phone_with_leniency_then_succeed(
          2, ["PHONE_NUMBER", "PHONE_NUMBER"],
          ((16, 30), (60, 77),), 0.4,
          ['Recognized as US region phone number, using PhoneRecognizer','Recognized as FR region phone number, using PhoneRecognizer']),
+        # The international number comes first here: it is parsed successfully and
+        # used to be assigned back to the loop variable, so the national-format
+        # number that follows was explained with the previous match's region.
+        # Every case above puts the national number first, which hides that order.
+         ("My international number is +44 1234 567890, and my US one is (415) 555-0132",
+         2, ["PHONE_NUMBER", "PHONE_NUMBER"],
+         ((27, 42), (61, 75),), 0.4,
+         ['Recognized as GB region phone number, using PhoneRecognizer','Recognized as US region phone number, using PhoneRecognizer']),
         # fmt: on
     ],
 )
