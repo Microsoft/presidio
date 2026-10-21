@@ -44,6 +44,7 @@ nav:
                   - Tutorial: analyzer/adding_recognizers.md
                   - Best practices: analyzer/developing_recognizers.md
                   - Recognizer registry from file: analyzer/recognizer_registry_provider.md
+                  - HuggingFace NER inference backends: analyzer/huggingface_ner_inference.md
               - Filtering recognizers by country: analyzer/filtering_by_country.md
               - Multi-language support: analyzer/languages.md
               - Customizing the NLP model:

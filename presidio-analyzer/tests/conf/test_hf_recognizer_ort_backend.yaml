@@ -1,0 +1,21 @@
+supported_languages:
+  - en
+
+recognizers:
+  - name: "HuggingFace NER (ONNX)"
+    type: predefined
+    class_name: HuggingFaceNerRecognizer
+    model_name: onnx-community/stanford-deidentifier-base-ONNX
+    backend: ort
+    subfolder: onnx
+    file_name: model_quantized.onnx
+    supported_languages:
+      - en
+    supported_entities:
+      - PERSON
+      - PHONE_NUMBER
+    label_mapping:
+      PATIENT: PERSON
+      PHONE: PHONE_NUMBER
+    aggregation_strategy: simple
+    threshold: 0.3

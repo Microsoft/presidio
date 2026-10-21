@@ -145,3 +145,4 @@ Related Presidio documentation:
 - [Transformer Models](transformers.md)
 - [spaCy and Stanza Models](spacy_stanza.md)
 - [Customizing NLP Models](../customizing_nlp_models.md)
+- [HuggingFace NER inference backends](../huggingface_ner_inference.md) — ORT execution providers (CUDA, TensorRT, OpenVINO, CoreML, ROCm) and Intel-specific acceleration via `HuggingFaceNerRecognizer`

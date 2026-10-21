@@ -1,9 +1,11 @@
 """Tests for HuggingFaceNerRecognizer."""
 
 import logging
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+from presidio_analyzer import RecognizerResult
 from presidio_analyzer.predefined_recognizers import (
     HuggingFaceNerRecognizer,
 )
@@ -18,6 +20,21 @@ HF_PIPELINE_PATH = (
 )
 
 TEST_MODEL_NAME = "dslim/bert-base-NER"
+
+
+def patch_ort_model(mock_ort_model_cls):
+    """Make ``from optimum.onnxruntime import ORTModelForTokenClassification``
+    resolve to ``mock_ort_model_cls`` without requiring optimum to be installed.
+    """
+    return patch.dict(
+        sys.modules,
+        {
+            "optimum": MagicMock(),
+            "optimum.onnxruntime": MagicMock(
+                ORTModelForTokenClassification=mock_ort_model_cls
+            ),
+        },
+    )
 
 
 @pytest.fixture
@@ -277,6 +294,7 @@ def test_load_invokes_hf_pipeline_with_expected_args():
             tokenizer="test-model",
             aggregation_strategy="simple",
             device=-1,
+            model_kwargs=None,
         )
 
 
@@ -472,14 +490,60 @@ def test_hf_recognizer_device_fallback_and_validation():
 
 
 @pytest.mark.usefixtures("mock_torch_installed")
-@patch(HF_PIPELINE_PATH, new=MagicMock())
-def test_hf_recognizer_init_logs_warning_for_extra_kwargs(caplog):
-    """Test that valid but unsupported kwargs trigger a warning."""
-    caplog.set_level(logging.WARNING, logger="presidio-analyzer")
-    # Passed 'unsupported_arg' which is not in __init__
-    HuggingFaceNerRecognizer(model_name="test-model", unsupported_arg="some_value")
+def test_hf_recognizer_forwards_extra_kwargs_as_model_kwargs():
+    """Test that extra kwargs are forwarded to the pipeline via model_kwargs."""
+    with patch(HF_PIPELINE_PATH, new=MagicMock()) as mock_hf_pipeline:
+        rec = HuggingFaceNerRecognizer(
+            model_name="test-model",
+            device=-1,
+            revision="main",
+            cache_dir="/tmp/cache",
+        )
 
-    assert "Ignoring unsupported kwargs" in caplog.text
+        assert rec.model_kwargs == {
+            "revision": "main",
+            "cache_dir": "/tmp/cache",
+        }
+        # transformers.pipeline() forwards revision/token/trust_remote_code
+        # itself, so they must be top-level arguments, not inside model_kwargs.
+        mock_hf_pipeline.assert_called_once_with(
+            "token-classification",
+            model="test-model",
+            tokenizer="test-model",
+            aggregation_strategy="simple",
+            device=-1,
+            model_kwargs={"cache_dir": "/tmp/cache"},
+            revision="main",
+        )
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_torch_hub_kwargs_lifted_out_of_model_kwargs():
+    """revision/token/trust_remote_code go to pipeline() directly.
+
+    Regression: passing them inside model_kwargs makes transformers raise
+    "got multiple values for keyword argument".
+    """
+    with patch(HF_PIPELINE_PATH, new=MagicMock()) as mock_hf_pipeline:
+        rec = HuggingFaceNerRecognizer(
+            model_name="test-model",
+            device=-1,
+            revision="abc123",
+            token="hf_xxx",
+            trust_remote_code=True,
+        )
+
+        _, kwargs = mock_hf_pipeline.call_args
+        assert kwargs["model_kwargs"] is None
+        assert kwargs["revision"] == "abc123"
+        assert kwargs["token"] == "hf_xxx"
+        assert kwargs["trust_remote_code"] is True
+        # The recognizer keeps the original kwargs untouched.
+        assert rec.model_kwargs == {
+            "revision": "abc123",
+            "token": "hf_xxx",
+            "trust_remote_code": True,
+        }
 
 
 @pytest.mark.usefixtures("mock_torch_installed")
@@ -600,6 +664,255 @@ def test_hf_recognizer_analyze_handles_malformed_pipeline_output(
     caplog.clear()
     rec.ner_pipeline.return_value = [{"entity": "PER", "score": 0.9}]
     assert rec.analyze("test", entities=["PERSON"]) == []
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_backend_requires_optimum():
+    """ort backend raises ImportError when optimum is not installed."""
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            None,
+        ):
+            with pytest.raises(ImportError, match="optimum is not installed"):
+                HuggingFaceNerRecognizer(model_name="test-model", backend="ort")
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_unknown_backend_raises():
+    """Backends other than 'torch' or 'ort' are rejected at construction."""
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with pytest.raises(ValueError, match="Unsupported backend"):
+            HuggingFaceNerRecognizer(model_name="test-model", backend="ov")
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_backend_warns_when_device_set(caplog):
+    """Explicit device with ort backend logs a warning (device is ignored)."""
+    caplog.set_level(logging.WARNING, logger="presidio-analyzer")
+    mock_optimum = MagicMock()
+    mock_ort_model_cls = MagicMock()
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            mock_optimum,
+        ):
+            with patch_ort_model(mock_ort_model_cls):
+                HuggingFaceNerRecognizer(
+                    model_name="test-model", backend="ort", device="cuda"
+                )
+
+    assert "ignored by the 'ort' backend" in caplog.text
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_backend_ignores_invalid_device(caplog):
+    """ort backend skips device parsing: an invalid device must not raise."""
+    caplog.set_level(logging.WARNING, logger="presidio-analyzer")
+    mock_optimum = MagicMock()
+    mock_ort_model_cls = MagicMock()
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            mock_optimum,
+        ):
+            with patch_ort_model(mock_ort_model_cls):
+                # "not-a-device" would raise ValueError via _parse_device on
+                # the torch backend; ort skips parsing and forces CPU.
+                rec = HuggingFaceNerRecognizer(
+                    model_name="test-model",
+                    backend="ort",
+                    device="not-a-device",
+                )
+
+    assert rec.device == -1
+    assert "ignored by the 'ort' backend" in caplog.text
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_backend_cpu_device_no_warning(caplog):
+    """device='cpu' on ort is consistent with default behavior; no warning."""
+    caplog.set_level(logging.WARNING, logger="presidio-analyzer")
+    mock_optimum = MagicMock()
+    mock_ort_model_cls = MagicMock()
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            mock_optimum,
+        ):
+            with patch_ort_model(mock_ort_model_cls):
+                rec = HuggingFaceNerRecognizer(
+                    model_name="test-model", backend="ort", device="cpu"
+                )
+
+    assert rec.device == -1
+    assert "ignored by the 'ort' backend" not in caplog.text
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_backend_loads_optimum_pipeline():
+    """ort backend pre-loads ORTModel, then hands it to optimum_pipeline."""
+    mock_optimum = MagicMock()
+    mock_ort_model_cls = MagicMock()
+    mock_model_instance = MagicMock()
+    mock_ort_model_cls.from_pretrained.return_value = mock_model_instance
+
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            mock_optimum,
+        ):
+            with patch_ort_model(mock_ort_model_cls):
+                HuggingFaceNerRecognizer(model_name="test-model", backend="ort")
+
+    mock_ort_model_cls.from_pretrained.assert_called_once_with("test-model")
+    mock_optimum.assert_called_once_with(
+        "token-classification",
+        model=mock_model_instance,
+        tokenizer="test-model",
+        aggregation_strategy="simple",
+        accelerator="ort",
+        model_kwargs=None,
+    )
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_optimum_model_kwargs_scoped_to_model_loader():
+    """model_kwargs flow only to ORTModel.from_pretrained, not the pipeline.
+
+    Pipeline-level kwargs would leak into transformers' tokenizer/config
+    loading and break mixed-layout repos (e.g. onnx-community/* where the
+    ONNX file is in ``onnx/`` but the tokenizer is at the repo root).
+    """
+    mock_optimum = MagicMock()
+    mock_ort_model_cls = MagicMock()
+    mock_model_instance = MagicMock()
+    mock_ort_model_cls.from_pretrained.return_value = mock_model_instance
+
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            mock_optimum,
+        ):
+            with patch_ort_model(mock_ort_model_cls):
+                HuggingFaceNerRecognizer(
+                    model_name="test-model",
+                    backend="ort",
+                    subfolder="onnx",
+                    file_name="model_fp16.onnx",
+                )
+
+    mock_ort_model_cls.from_pretrained.assert_called_once_with(
+        "test-model", subfolder="onnx", file_name="model_fp16.onnx"
+    )
+    _, pipeline_kwargs = mock_optimum.call_args
+    assert "subfolder" not in pipeline_kwargs
+    assert "file_name" not in pipeline_kwargs
+    assert pipeline_kwargs["model_kwargs"] is None
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_revision_and_token_reach_tokenizer():
+    """revision/token go to both the ORT model loader and optimum's pipeline.
+
+    The pipeline loads the tokenizer by name, so without these it would fetch
+    the default branch without credentials.
+    """
+    mock_optimum = MagicMock()
+    mock_ort_model_cls = MagicMock()
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            mock_optimum,
+        ):
+            with patch_ort_model(mock_ort_model_cls):
+                HuggingFaceNerRecognizer(
+                    model_name="test-model",
+                    backend="ort",
+                    revision="abc123",
+                    token="hf_xxx",
+                    trust_remote_code=True,
+                    cache_dir="/tmp/hf",
+                    local_files_only=True,
+                    subfolder="onnx",
+                )
+
+    mock_ort_model_cls.from_pretrained.assert_called_once_with(
+        "test-model",
+        revision="abc123",
+        token="hf_xxx",
+        trust_remote_code=True,
+        cache_dir="/tmp/hf",
+        local_files_only=True,
+        subfolder="onnx",
+    )
+    _, pipeline_kwargs = mock_optimum.call_args
+    assert pipeline_kwargs["revision"] == "abc123"
+    assert pipeline_kwargs["token"] == "hf_xxx"
+    assert pipeline_kwargs["trust_remote_code"] is True
+    # cache_dir / local_files_only reach the tokenizer via model_kwargs.
+    assert pipeline_kwargs["model_kwargs"] == {
+        "cache_dir": "/tmp/hf",
+        "local_files_only": True,
+    }
+    # Loader-only keys still must not leak into the pipeline call.
+    assert "subfolder" not in pipeline_kwargs
+    assert "subfolder" not in pipeline_kwargs["model_kwargs"]
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_torch_backend_no_torch_raises():
+    """Test that torch backend raises ImportError when torch is missing."""
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.torch",
+            None,
+        ):
+            with pytest.raises(ImportError, match="torch is not installed"):
+                HuggingFaceNerRecognizer(model_name="test-model", backend="torch")
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_backend_requires_optimum_onnx():
+    """The ort backend raises ImportError when optimum.onnxruntime is missing."""
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            MagicMock(),
+        ):
+            # A None entry in sys.modules makes the import raise ImportError,
+            # simulating optimum installed without the optimum-onnx package.
+            with patch.dict(sys.modules, {"optimum.onnxruntime": None}):
+                with pytest.raises(ImportError, match="optimum-onnx is not installed"):
+                    HuggingFaceNerRecognizer(model_name="test-model", backend="ort")
+
+
+@pytest.mark.usefixtures("mock_torch_installed")
+def test_hf_recognizer_ort_backend_load_failure_logs_and_raises(caplog):
+    """A model load failure on the ort backend is logged and re-raised."""
+    caplog.set_level(logging.ERROR, logger="presidio-analyzer")
+    mock_ort_model_cls = MagicMock()
+    mock_ort_model_cls.from_pretrained.side_effect = RuntimeError("no such model")
+    with patch(HF_PIPELINE_PATH, new=MagicMock()):
+        with patch(
+            "presidio_analyzer.predefined_recognizers.ner."
+            "huggingface_ner_recognizer.optimum_pipeline",
+            MagicMock(),
+        ):
+            with patch_ort_model(mock_ort_model_cls):
+                with pytest.raises(RuntimeError, match="no such model"):
+                    HuggingFaceNerRecognizer(model_name="test-model", backend="ort")
+
+    assert "Failed to load model test-model with ort backend" in caplog.text
 
 
 def test_hf_recognizer_loader_supported_entities_filtering():
@@ -723,3 +1036,169 @@ def test_hf_recognizer_resolves_deferred_tokenizer_chunker(mock_pipeline):
     assert chunker.tokenizer is mock_tokenizer
     assert chunker.max_tokens == 128
     assert chunker.overlap_tokens == 16
+
+
+# ---------------------------------------------------------------------------
+# End-to-end tests with real model loading (marked ``hub``).
+#
+# Unlike the mocked tests above, these download real models from the
+# HuggingFace Hub and exercise the actual transformers/optimum pipelines.
+# They are the only coverage for the recognizer's load() path against real
+# library behavior. Deselect offline with ``-m "not hub"``.
+#
+# Two tiers:
+# 1. Mechanics tests with hf-internal-testing/tiny-random-bert (~100KB).
+#    The weights are random, so they assert on mechanics (spans, types,
+#    thresholds, torch/ort parity), not on meaningful predictions.
+# 2. Semantic tests with the Stanford de-identifier, the model family used
+#    by conf/hf_ner_onnx.yaml. These assert on actual PII detection, and the
+#    ort test covers the mixed-layout repo scenario (ONNX under onnx/,
+#    tokenizer at root) that requires subfolder/file_name scoping.
+# ---------------------------------------------------------------------------
+
+TINY_MODEL = "hf-internal-testing/tiny-random-bert"
+# Hub repos are mutable; pin the revisions the assertions were written against.
+DEID_TORCH_MODEL = "StanfordAIMI/stanford-deidentifier-base"
+DEID_TORCH_REVISION = "661b9c1c717d3165512d440abc3700c386aefab6"
+DEID_ORT_MODEL = "onnx-community/stanford-deidentifier-base-ONNX"
+DEID_ORT_REVISION = "a20d96e28778e6da0aadb27cb107653fac7b77f3"
+TINY_TEXT = "John Smith works at Contoso in Berlin since 2019."
+# Random-weight model emits LABEL_0/LABEL_1; map both so output is non-empty.
+TINY_LABEL_MAPPING = {"LABEL_0": "PERSON", "LABEL_1": "LOCATION"}
+
+
+def _assert_valid_results(results, text):
+    assert isinstance(results, list)
+    assert len(results) > 0
+    for r in results:
+        assert isinstance(r, RecognizerResult)
+        assert r.entity_type in ("PERSON", "LOCATION")
+        assert 0 <= r.start < r.end <= len(text)
+        assert 0.0 <= r.score <= 1.0
+
+
+@pytest.mark.hub
+def test_hf_recognizer_e2e_torch_backend():
+    """Real torch pipeline end-to-end on a tiny random model."""
+    pytest.importorskip("torch", reason="torch is not installed")
+
+    rec = HuggingFaceNerRecognizer(
+        model_name=TINY_MODEL,
+        backend="torch",
+        device="cpu",
+        label_mapping=TINY_LABEL_MAPPING,
+        threshold=0.0,
+    )
+    results = rec.analyze(TINY_TEXT, entities=["PERSON", "LOCATION"])
+    _assert_valid_results(results, TINY_TEXT)
+
+
+@pytest.mark.hub
+def test_hf_recognizer_e2e_ort_backend():
+    """Real ONNX Runtime pipeline end-to-end on a tiny random model.
+
+    The repo has no .onnx weights, so this also exercises optimum's
+    export-on-the-fly path (export=True forwarded via **model_kwargs).
+    """
+    pytest.importorskip("optimum.onnxruntime", reason="optimum-onnx is not installed")
+
+    rec = HuggingFaceNerRecognizer(
+        model_name=TINY_MODEL,
+        backend="ort",
+        label_mapping=TINY_LABEL_MAPPING,
+        threshold=0.0,
+        export=True,
+    )
+    results = rec.analyze(TINY_TEXT, entities=["PERSON", "LOCATION"])
+    _assert_valid_results(results, TINY_TEXT)
+
+
+@pytest.mark.hub
+def test_hf_recognizer_e2e_torch_and_ort_agree_on_spans():
+    """Both backends run the same model; spans and scores should match."""
+    pytest.importorskip("torch", reason="torch is not installed")
+    pytest.importorskip("optimum.onnxruntime", reason="optimum-onnx is not installed")
+
+    common = dict(
+        model_name=TINY_MODEL,
+        label_mapping=TINY_LABEL_MAPPING,
+        threshold=0.0,
+    )
+    torch_results = HuggingFaceNerRecognizer(
+        backend="torch", device="cpu", **common
+    ).analyze(TINY_TEXT, entities=["PERSON", "LOCATION"])
+    ort_results = HuggingFaceNerRecognizer(
+        backend="ort", export=True, **common
+    ).analyze(TINY_TEXT, entities=["PERSON", "LOCATION"])
+
+    torch_spans = [(r.entity_type, r.start, r.end) for r in torch_results]
+    ort_spans = [(r.entity_type, r.start, r.end) for r in ort_results]
+    assert torch_spans == ort_spans
+    for tr, orr in zip(torch_results, ort_results):
+        assert abs(tr.score - orr.score) < 1e-3
+
+
+DEID_TEXT = (
+    "Hi, I'm Dr. Sarah Chen from Mount Sinai Hospital. "
+    "Please call me at 555-123-4567 on March 5th, 2026."
+)
+DEID_LABEL_MAPPING = {
+    "PATIENT": "PERSON",
+    "HCW": "PERSON",
+    "HOSPITAL": "ORGANIZATION",
+    "VENDOR": "ORGANIZATION",
+    "DATE": "DATE_TIME",
+    "PHONE": "PHONE_NUMBER",
+    "ID": "ID",
+}
+DEID_ENTITIES = ["PERSON", "ORGANIZATION", "DATE_TIME", "PHONE_NUMBER"]
+
+
+def _assert_deid_detections(results, text):
+    detected = {(r.entity_type, text[r.start : r.end]) for r in results}
+    assert ("PERSON", "Dr. Sarah Chen") in detected
+    assert ("ORGANIZATION", "Mount Sinai Hospital") in detected
+    assert ("PHONE_NUMBER", "555-123-4567") in detected
+
+
+@pytest.mark.hub
+def test_hf_recognizer_e2e_torch_stanford_deidentifier():
+    """Real PII detection with the torch backend on the Stanford model."""
+    pytest.importorskip("torch", reason="torch is not installed")
+
+    rec = HuggingFaceNerRecognizer(
+        model_name=DEID_TORCH_MODEL,
+        backend="torch",
+        device="cpu",
+        revision=DEID_TORCH_REVISION,
+        label_mapping=DEID_LABEL_MAPPING,
+        threshold=0.5,
+    )
+    results = rec.analyze(DEID_TEXT, entities=DEID_ENTITIES)
+    _assert_deid_detections(results, DEID_TEXT)
+
+
+@pytest.mark.hub
+def test_hf_recognizer_e2e_ort_mixed_layout_repo():
+    """Real PII detection with ort on a mixed-layout repo.
+
+    onnx-community/stanford-deidentifier-base-ONNX keeps config/tokenizer at
+    the repo root and ONNX files under onnx/. This is the scenario that
+    requires subfolder/file_name to be scoped to the model loader only —
+    regression coverage for the pipeline-level kwarg leak.
+    """
+    pytest.importorskip("optimum.onnxruntime", reason="optimum-onnx is not installed")
+
+    rec = HuggingFaceNerRecognizer(
+        model_name=DEID_ORT_MODEL,
+        backend="ort",
+        revision=DEID_ORT_REVISION,
+        subfolder="onnx",
+        # INT8 variant: same detections as model.onnx on this text, but a
+        # 105MB download instead of 416MB (matters in CI, no HF cache there).
+        file_name="model_quantized.onnx",
+        label_mapping=DEID_LABEL_MAPPING,
+        threshold=0.5,
+    )
+    results = rec.analyze(DEID_TEXT, entities=DEID_ENTITIES)
+    _assert_deid_detections(results, DEID_TEXT)

@@ -20,6 +20,11 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "skip_engine(nlp_engine): skip test for given nlp engine"
     )
+    config.addinivalue_line(
+        "markers",
+        "hub: test downloads models from the HuggingFace Hub "
+        "(deselect offline with -m 'not hub')",
+    )
 
 
 @pytest.fixture(scope="session")

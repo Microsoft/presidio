@@ -230,6 +230,9 @@ class HuggingFaceRecognizerConfig(PredefinedRecognizerConfig):
     chunk_overlap: Optional[int] = Field(None, description="Chunk overlap")
     chunk_size: Optional[int] = Field(None, description="Chunk size")
     device: Optional[Union[str, int]] = Field(None, description="Device (cpu/gpu)")
+    backend: Optional[Literal["torch", "ort"]] = Field(
+        None, description="Inference backend: 'torch' (default) or 'ort'"
+    )
     label_prefixes: Optional[List[str]] = Field(
         default=None, description="Prefixes to strip from labels (e.g. B-, I-)"
     )

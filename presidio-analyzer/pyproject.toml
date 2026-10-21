@@ -72,6 +72,11 @@ langextract = [
     "more-itertools (>=10.0.0,<12.0.0)",
     "jinja2 (>=3.0.0,<4.0.0)",
 ]
+onnxruntime = [
+    "optimum (>=2.1.0,<3.0.0)",
+    "optimum-onnx[onnxruntime] (>=0.1.0,<2.0.0)",
+    "transformers (>=4.0.0,<5.0.0)",
+]
 
 [dependency-groups]
 dev = [

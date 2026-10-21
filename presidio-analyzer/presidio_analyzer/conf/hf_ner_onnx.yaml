@@ -1,0 +1,40 @@
+supported_languages:
+  - en
+default_score_threshold: 0
+nlp_configuration:
+  nlp_engine_name: slim
+  models:
+    - lang_code: en
+      model_name: en_core_web_sm
+
+recognizer_registry:
+  recognizers:
+    - name: SpacyRecognizer
+      type: predefined
+      enabled: false
+
+    - name: "HuggingFace NER (ONNX)"
+      type: predefined
+      class_name: HuggingFaceNerRecognizer
+      model_name: onnx-community/stanford-deidentifier-base-ONNX
+      backend: ort
+      subfolder: onnx
+      file_name: model.onnx
+      supported_languages:
+        - en
+      supported_entities:
+        - PERSON
+        - ORGANIZATION
+        - DATE_TIME
+        - PHONE_NUMBER
+        - ID
+      label_mapping:
+        PATIENT: PERSON
+        HCW: PERSON
+        HOSPITAL: ORGANIZATION
+        VENDOR: ORGANIZATION
+        DATE: DATE_TIME
+        PHONE: PHONE_NUMBER
+        ID: ID
+      aggregation_strategy: simple
+      threshold: 0.3

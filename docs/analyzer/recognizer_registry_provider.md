@@ -92,12 +92,25 @@ The recognizer list comprises of both the predefined and custom recognizers, for
     type: "predefined"
     class_name: "HuggingFaceNerRecognizer"
     model_name: "dslim/bert-base-NER"
+    backend: "torch"      # or "ort" for ONNX Runtime
     supported_languages:
       - en
     supported_entities: ["PERSON", "LOCATION", "ORGANIZATION"]
     aggregation_strategy: "simple"
     device: "cpu"
 ```
+
+!!! tip "Optimized inference (GPU, CPU, Intel)"
+
+    `HuggingFaceNerRecognizer` supports a `torch` backend (default) and an
+    `ort` backend (ONNX Runtime via `optimum`). The `ort` backend can
+    target NVIDIA GPU (`CUDAExecutionProvider`,
+    `TensorrtExecutionProvider`), Intel CPU/iGPU/NPU
+    (`OpenVINOExecutionProvider`), AMD GPU (`ROCMExecutionProvider`), and
+    Apple Silicon (`CoreMLExecutionProvider`) via execution providers.
+    See [HuggingFace NER inference backends](huggingface_ner_inference.md)
+    for install instructions, YAML examples per accelerator, and guidance
+    on picking quantized ONNX variants.
 
 ### The recognizer parameters
 

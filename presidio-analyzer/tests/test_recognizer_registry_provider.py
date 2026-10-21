@@ -2,6 +2,7 @@
 
 import pytest
 import re
+import sys
 from pathlib import Path
 from typing import List
 from inspect import signature
@@ -382,6 +383,95 @@ def test_recognizer_registry_provider_yaml_character_chunker_config():
     assert isinstance(recognizer.text_chunker, CharacterBasedTextChunker)
     assert recognizer.text_chunker.chunk_size == 300
     assert recognizer.text_chunker.chunk_overlap == 40
+
+
+def test_recognizer_registry_provider_yaml_hf_ort_backend():
+    """backend and loader kwargs reach HuggingFaceNerRecognizer from YAML."""
+    from unittest.mock import MagicMock, patch
+    from presidio_analyzer.predefined_recognizers.ner import HuggingFaceNerRecognizer
+
+    this_path = Path(__file__).parent.absolute()
+    test_yaml = Path(this_path, "conf/test_hf_recognizer_ort_backend.yaml")
+
+    mock_ort_model_cls = MagicMock()
+    mock_pipeline_instance = MagicMock(
+        return_value=[
+            {"entity_group": "PATIENT", "score": 0.95, "start": 8, "end": 16},
+            {"entity_group": "PHONE", "score": 0.90, "start": 24, "end": 36},
+        ]
+    )
+    mock_optimum_pipeline = MagicMock(return_value=mock_pipeline_instance)
+    hf_module = "presidio_analyzer.predefined_recognizers.ner.huggingface_ner_recognizer"
+    with (
+        patch(f"{hf_module}.hf_pipeline", MagicMock()),
+        patch(f"{hf_module}.optimum_pipeline", mock_optimum_pipeline),
+        # Inject a fake optimum.onnxruntime so the test does not need the
+        # optional package installed.
+        patch.dict(
+            sys.modules,
+            {
+                "optimum": MagicMock(),
+                "optimum.onnxruntime": MagicMock(
+                    ORTModelForTokenClassification=mock_ort_model_cls
+                ),
+            },
+        ),
+    ):
+        provider = RecognizerRegistryProvider(conf_file=test_yaml)
+        registry = provider.create_recognizer_registry()
+
+    hf_recognizers = [
+        r for r in registry.recognizers if isinstance(r, HuggingFaceNerRecognizer)
+    ]
+    assert len(hf_recognizers) == 1
+    recognizer = hf_recognizers[0]
+
+    assert recognizer.backend == "ort"
+    assert recognizer.model_kwargs == {
+        "subfolder": "onnx",
+        "file_name": "model_quantized.onnx",
+    }
+    mock_ort_model_cls.from_pretrained.assert_called_once_with(
+        "onnx-community/stanford-deidentifier-base-ONNX",
+        subfolder="onnx",
+        file_name="model_quantized.onnx",
+    )
+    # Loader kwargs must not leak into the pipeline call.
+    _, pipeline_kwargs = mock_optimum_pipeline.call_args
+    assert "subfolder" not in pipeline_kwargs
+    assert "file_name" not in pipeline_kwargs
+
+    # The YAML-loaded recognizer maps model labels to Presidio entities and
+    # returns them from analyze().
+    text = "Patient John Doe, call 555-123-4567 today"
+    results = recognizer.analyze(text, ["PERSON", "PHONE_NUMBER"])
+    assert [(r.entity_type, r.start, r.end) for r in results] == [
+        ("PERSON", 8, 16),
+        ("PHONE_NUMBER", 24, 36),
+    ]
+
+
+def test_recognizer_registry_provider_yaml_hf_invalid_backend_fails_at_parse():
+    """An unknown backend value is rejected with a config error, not a TypeError."""
+    registry_configuration = {
+        "supported_languages": ["en"],
+        "recognizers": [
+            {
+                "name": "HF NER",
+                "type": "predefined",
+                "class_name": "HuggingFaceNerRecognizer",
+                "model_name": "test-model",
+                "backend": "onnx",
+                "supported_languages": ["en"],
+            }
+        ],
+    }
+    with pytest.raises(ValueError, match="Invalid recognizer registry") as exc_info:
+        RecognizerRegistryProvider(registry_configuration=registry_configuration)
+    # The wrapped pydantic error names the offending field and the allowed values.
+    cause = str(exc_info.value.__cause__)
+    assert "backend" in cause
+    assert "'torch' or 'ort'" in cause
 
 
 def test_recognizer_registry_provider_tokenizer_chunker_config():
