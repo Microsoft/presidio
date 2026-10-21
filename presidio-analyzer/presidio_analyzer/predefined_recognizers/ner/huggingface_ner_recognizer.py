@@ -121,6 +121,7 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
         tokenizer_name: Optional[str] = None,
         text_chunker: Optional[BaseTextChunker] = None,
         label_prefixes: Optional[List[str]] = None,
+        inference_batch_size: int = 8,
         **kwargs,
     ):
         """Initialize the HuggingFace NER Recognizer.
@@ -154,6 +155,8 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
             loader converts the ``text_chunker`` dict to a chunker instance
             automatically.
         :param label_prefixes: List of label prefixes to strip (e.g., B-, I-).
+        :param inference_batch_size: Batch size for HuggingFace pipeline
+            batch inference. Defaults to 8.
         :raises ImportError: If transformers or torch libraries are not installed.
         """
         # Early check for required dependencies
@@ -182,6 +185,7 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
             )
         self.device = self._parse_device(device)
         self.label_prefixes = label_prefixes or ["B-", "I-", "U-", "L-"]
+        self.inference_batch_size = inference_batch_size
         self.ner_pipeline = None
 
         if kwargs:
@@ -322,6 +326,92 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
                     return label[len(prefix) :]
         return label
 
+    def _pred_to_recognizer_result(
+        self, pred: Dict[str, Any]
+    ) -> Optional[RecognizerResult]:
+        """Convert a single HuggingFace prediction dict to a RecognizerResult.
+
+        Shared by both the per-chunk and batched-chunks code paths so that
+        label normalization, score thresholding, and explanation construction
+        stay in one place.
+
+        :param pred: A single prediction dict from the HF pipeline.
+        :return: RecognizerResult, or None if the prediction is filtered out
+            (missing label, score below threshold, missing offsets, etc.).
+        """
+        raw_label = pred.get("entity_group") or pred.get("entity")
+        if not raw_label:
+            return None
+
+        model_label = self._normalize_label(raw_label)
+
+        presidio_entity = self.label_mapping.get(model_label)
+        if not presidio_entity:
+            # If label is not mapped, use the model's label as is. This allows
+            # discovering entities not explicitly defined in the mapping.
+            presidio_entity = model_label
+
+        raw_score = pred.get("score", 0.0)
+        try:
+            score = float(raw_score)
+        except (TypeError, ValueError):
+            logger.warning("Failed to convert score to float: %r", raw_score)
+            return None
+
+        if score < self.threshold:
+            return None
+
+        start = pred.get("start")
+        end = pred.get("end")
+        if start is None or end is None:
+            return None
+
+        if raw_label == model_label:
+            textual_explanation = (
+                f"Identified as {presidio_entity} by {self.model_name} "
+                f"(label: {raw_label})"
+            )
+        else:
+            textual_explanation = (
+                f"Identified as {presidio_entity} by {self.model_name} "
+                f"(original label: {raw_label}, normalized: {model_label})"
+            )
+
+        explanation = AnalysisExplanation(
+            recognizer=self.name,
+            original_score=score,
+            textual_explanation=textual_explanation,
+        )
+
+        return RecognizerResult(
+            entity_type=presidio_entity,
+            start=start,
+            end=end,
+            score=score,
+            analysis_explanation=explanation,
+        )
+
+    def _preds_to_results(
+        self, preds: Any
+    ) -> List[RecognizerResult]:
+        """Convert a list of HF prediction dicts to RecognizerResult list.
+
+        Validates input shape and skips malformed items with a warning.
+        """
+        if not isinstance(preds, list):
+            logger.warning("Unexpected pipeline output type: %s", type(preds))
+            return []
+
+        results: List[RecognizerResult] = []
+        for pred in preds:
+            if not isinstance(pred, dict):
+                logger.warning("Unexpected prediction item type: %s", type(pred))
+                continue
+            result = self._pred_to_recognizer_result(pred)
+            if result is not None:
+                results.append(result)
+        return results
+
     def _predict_chunk(self, chunk_text: str) -> List[RecognizerResult]:
         """Perform NER prediction on a single text chunk.
 
@@ -330,83 +420,36 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
         :param chunk_text: The chunk of text to analyze.
         :return: List of RecognizerResult objects.
         """
-        chunk_results = []
-        # Run inference on the chunk
         try:
             preds = self.ner_pipeline(chunk_text)
         except Exception as e:
             logger.warning(f"NER prediction failed for chunk: {e}", exc_info=True)
             return []
 
-        # Helper to process a single prediction dictionary
-        def process_pred(pred: Dict[str, Any]) -> None:
-            """Convert a single HuggingFace prediction dict to RecognizerResult."""
-            raw_label = pred.get("entity_group") or pred.get("entity")
-            if not raw_label:
-                return
+        return self._preds_to_results(preds)
 
-            model_label = self._normalize_label(raw_label)
+    def _predict_batch_chunks(
+        self, chunk_texts: List[str]
+    ) -> List[List[RecognizerResult]]:
+        """Perform NER prediction on multiple text chunks in a single batch.
 
-            presidio_entity = self.label_mapping.get(model_label)
-            if not presidio_entity:
-                # If label is not mapped, use the model's label as is. This allows
-                # discovering entities not explicitly defined in the mapping.
-                presidio_entity = model_label
+        Uses HuggingFace pipeline's built-in batching for efficiency.
 
-            raw_score = pred.get("score", 0.0)
-            try:
-                score = float(raw_score)
-            except (TypeError, ValueError):
-                logger.warning("Failed to convert score to float: %r", raw_score)
-                return
-
-            if score < self.threshold:
-                return
-
-            start = pred.get("start")
-            end = pred.get("end")
-            if start is None or end is None:
-                return
-
-            if raw_label == model_label:
-                textual_explanation = (
-                    f"Identified as {presidio_entity} by {self.model_name} "
-                    f"(label: {raw_label})"
-                )
-            else:
-                textual_explanation = (
-                    f"Identified as {presidio_entity} by {self.model_name} "
-                    f"(original label: {raw_label}, normalized: {model_label})"
-                )
-
-            explanation = AnalysisExplanation(
-                recognizer=self.name,
-                original_score=score,
-                textual_explanation=textual_explanation,
+        :param chunk_texts: List of text chunks to analyze.
+        :return: List of lists of RecognizerResult objects, one list per chunk.
+        """
+        try:
+            batch_preds = self.ner_pipeline(
+                chunk_texts, batch_size=self.inference_batch_size
             )
-
-            chunk_results.append(
-                RecognizerResult(
-                    entity_type=presidio_entity,
-                    start=start,
-                    end=end,
-                    score=score,
-                    analysis_explanation=explanation,
-                )
+        except Exception as e:
+            logger.warning(
+                f"Batch NER prediction failed, falling back to sequential: {e}",
+                exc_info=True,
             )
+            return [self._predict_chunk(t) for t in chunk_texts]
 
-        # Validate preds is a list before iterating
-        if not isinstance(preds, list):
-            logger.warning("Unexpected pipeline output type: %s", type(preds))
-            return []
-
-        for pred in preds:
-            if isinstance(pred, dict):
-                process_pred(pred)
-            else:
-                logger.warning("Unexpected prediction item type: %s", type(pred))
-
-        return chunk_results
+        return [self._preds_to_results(preds) for preds in batch_preds]
 
     def analyze(
         self,
@@ -454,3 +497,47 @@ class HuggingFaceNerRecognizer(LocalRecognizer):
             ]
 
         return results
+
+    def batch_analyze(
+        self,
+        texts: List[str],
+        entities: List[str],
+        nlp_artifacts_list: List[Optional[NlpArtifacts]],
+    ) -> List[List[RecognizerResult]]:
+        """Analyze multiple texts for entities using batch inference.
+
+        Overrides the default sequential implementation to leverage
+        HuggingFace pipeline's batch processing for GPU efficiency.
+
+        :param texts: List of texts to analyze
+        :param entities: Entity types to detect
+        :param nlp_artifacts_list: Parallel list of NLP artifacts (ignored)
+        :return: List of results per text, aligned with input texts
+        """
+        if not texts:
+            return []
+
+        entities = entities or []
+
+        if not self.ner_pipeline:
+            self.load()
+
+        all_results = self.text_chunker.predict_batch_with_chunking(
+            texts=texts,
+            predict_batch_func=self._predict_batch_chunks,
+        )
+
+        # Apply entity filtering per text (same as analyze())
+        if entities:
+            requested = set(entities)
+            supported = set(self.supported_entities)
+            all_results = [
+                [
+                    r
+                    for r in text_results
+                    if (r.entity_type in requested) or (r.entity_type not in supported)
+                ]
+                for text_results in all_results
+            ]
+
+        return all_results
