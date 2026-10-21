@@ -111,7 +111,10 @@ class BatchAnalyzerEngine:
 
             if type(value) in (str, int, bool, float):
                 results: List[RecognizerResult] = self.analyzer_engine.analyze(
-                    text=str(value), language=language, context=[key], **kwargs
+                    text=str(value),
+                    language=language,
+                    context=specific_context,
+                    **kwargs,
                 )
             elif isinstance(value, dict):
                 new_keys_to_skip = self._get_nested_keys_to_skip(key, keys_to_skip)

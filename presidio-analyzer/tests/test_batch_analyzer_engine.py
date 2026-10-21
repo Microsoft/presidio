@@ -210,6 +210,44 @@ def test_analyze_dict_on_nested_dict(batch_analyzer_engine_simple):
     )
 
 
+def test_analyze_dict_passes_context_to_scalar_values(batch_analyzer_engine_simple):
+    input_dict = {
+        "scalar": "www.abc.com",
+        "list": ["www.abc.com"],
+        "nested": {"scalar": "www.abc.com"},
+    }
+
+    results = {
+        result.key: result.recognizer_results
+        for result in batch_analyzer_engine_simple.analyze_dict(
+            input_dict=input_dict, language="en", context=["website"]
+        )
+    }
+
+    # "website" is a UrlRecognizer context word: 0.5 base score + 0.35 boost
+    assert results["scalar"][0].score == pytest.approx(0.85)
+    assert results["list"][0][0].score == pytest.approx(0.85)
+    [nested] = results["nested"]
+    assert nested.recognizer_results[0].score == pytest.approx(0.85)
+
+
+def test_analyze_dict_uses_parent_key_as_context_for_nested_scalar_values(
+    batch_analyzer_engine_simple,
+):
+    input_dict = {"website": {"home": "www.abc.com", "mirrors": ["www.abc.com"]}}
+
+    [website] = batch_analyzer_engine_simple.analyze_dict(
+        input_dict=input_dict, language="en"
+    )
+    nested = {
+        result.key: result.recognizer_results for result in website.recognizer_results
+    }
+
+    # The parent key "website" is a UrlRecognizer context word
+    assert nested["home"][0].score == pytest.approx(0.85)
+    assert nested["mirrors"][0][0].score == pytest.approx(0.85)
+
+
 @pytest.mark.parametrize(
     ["keys", "results_length"],
     ((None, 2), (["key_a"], 1), (["key_a.key_a1"], 1), (["key_c"], 2)),
