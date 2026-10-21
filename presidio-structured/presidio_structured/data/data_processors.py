@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from pandas import DataFrame
 from presidio_anonymizer.entities import OperatorConfig
@@ -156,28 +156,78 @@ class JsonDataProcessor(DataProcessorBase):
         return data
 
     @staticmethod
+    def _collect_leaf_paths(
+        data: Any, path: List[str], prefix: Optional[List[str]] = None
+    ) -> List[Tuple[List[str], Any]]:
+        """Expand a logical key path into one concrete path per leaf value.
+
+        A list met at any segment of the path is walked element by element and
+        the element index is recorded in the returned path, so every leaf keeps
+        an address that identifies that leaf alone.
+
+        :param data: Nested data (list or dictionary).
+        :param path: Remaining keys/indexes of the logical path.
+        :param prefix: Concrete path already resolved, from the root of the data.
+        :return: List of (concrete path, leaf value) pairs.
+        """
+        if prefix is None:
+            prefix = []
+        if not path:
+            if isinstance(data, list):
+                return [
+                    (prefix + [str(index)], item)
+                    for index, item in enumerate(data)
+                    if not isinstance(item, (dict, list))
+                ]
+            if isinstance(data, dict):
+                return []
+            return [(prefix, data)]
+
+        key, rest = path[0], path[1:]
+        if isinstance(data, list):
+            if key.isdigit():
+                return JsonDataProcessor._collect_leaf_paths(
+                    data[int(key)], rest, prefix + [key]
+                )
+            leaves: List[Tuple[List[str], Any]] = []
+            for index, item in enumerate(data):
+                leaves.extend(
+                    JsonDataProcessor._collect_leaf_paths(
+                        item, path, prefix + [str(index)]
+                    )
+                )
+            return leaves
+        if isinstance(data, dict):
+            return JsonDataProcessor._collect_leaf_paths(
+                data.get(key), rest, prefix + [key]
+            )
+        return []
+
+    @staticmethod
     def _set_nested_value(data: Union[Dict, List], path: List[str], value: Any) -> None:
         """
         Recursively sets a value in nested data using a given path.
+
+        The path is a *concrete* path: every list it crosses must be addressed
+        by its index, so a replacement can never be written to more than one
+        leaf.
 
         :param data: Nested data (JSON-like).
         :param path: List of keys/indexes representing the path.
         :param value: Value to be set.
         """
         for i, key in enumerate(path):
+            last = i == len(path) - 1
             if isinstance(data, list):
-                if i + 1 < len(path) and path[i + 1].isdigit():
-                    idx = int(path[i + 1])
-                    while len(data) <= idx:
-                        data.append({})
-                    data = data[idx]
-                    continue
-                else:
-                    for item in data:
-                        JsonDataProcessor._set_nested_value(item, path[i:], value)
+                if not key.isdigit():
                     return
+                idx = int(key)
+                if last:
+                    data[idx] = value
+                    return
+                data = data[idx]
             elif isinstance(data, dict):
-                if i == len(path) - 1:
+                if last:
                     data[key] = value
                 else:
                     data = data.setdefault(key, {})
@@ -205,17 +255,10 @@ class JsonDataProcessor(DataProcessorBase):
                 for item in data:
                     self._process(item, key_to_operator_mapping)
             else:
-                text_to_operate_on = self._get_nested_value(data, keys)
-                if text_to_operate_on:
-                    if isinstance(text_to_operate_on, list):
-                        for text in text_to_operate_on:
-                            operated_text = self._operate_on_text(
-                                text, operator_callable
-                            )
-                            self._set_nested_value(data, keys, operated_text)
-                    else:
-                        operated_text = self._operate_on_text(
-                            text_to_operate_on, operator_callable
-                        )
-                        self._set_nested_value(data, keys, operated_text)
+                for path, leaf in self._collect_leaf_paths(data, keys):
+                    if not leaf:
+                        continue
+                    self._set_nested_value(
+                        data, path, self._operate_on_text(leaf, operator_callable)
+                    )
         return data
