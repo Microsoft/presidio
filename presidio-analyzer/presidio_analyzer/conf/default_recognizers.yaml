@@ -322,6 +322,13 @@ recognizers:
     country_code: ph
 
 
+  - name: AeEmiratesIdRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+    country_code: ae
+
   - name: PlPeselRecognizer
     supported_languages: 
     - pl
