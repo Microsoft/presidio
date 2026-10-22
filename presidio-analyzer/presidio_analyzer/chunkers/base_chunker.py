@@ -119,6 +119,22 @@ class BaseTextChunker(ABC):
         if not predictions:
             return predictions
 
+        def is_overlapping(start: int, end: int, other: "RecognizerResult") -> bool:
+            overlap_start = max(start, other.start)
+            overlap_end = min(end, other.end)
+            if overlap_start >= overlap_end:
+                return False
+
+            # Calculate overlap ratio
+            overlap_len = overlap_end - overlap_start
+            span_len = end - start
+            other_len = other.end - other.start
+            if span_len <= 0 or other_len <= 0:
+                return False
+
+            # Check if overlap exceeds threshold
+            return overlap_len / min(span_len, other_len) > overlap_threshold
+
         # Sort by score descending to keep highest scoring entities
         sorted_preds = sorted(predictions, key=lambda p: p.score, reverse=True)
         unique = []
@@ -127,32 +143,30 @@ class BaseTextChunker(ABC):
             is_duplicate = False
             for i, kept in enumerate(unique):
                 # Check if same entity type and overlapping positions
-                if pred.entity_type == kept.entity_type:
-                    overlap_start = max(pred.start, kept.start)
-                    overlap_end = min(pred.end, kept.end)
-
-                    if overlap_start < overlap_end:
-                        # Calculate overlap ratio
-                        overlap_len = overlap_end - overlap_start
-                        pred_len = pred.end - pred.start
-                        kept_len = kept.end - kept.start
-
-                        if pred_len <= 0 or kept_len <= 0:
-                            continue
-
-                        # Check if overlap exceeds threshold
-                        if overlap_len / min(pred_len, kept_len) > overlap_threshold:
-                            is_duplicate = True
-                            if pred.start < kept.start or pred.end > kept.end:
-                                unique[i] = RecognizerResult(
-                                    entity_type=kept.entity_type,
-                                    start=min(pred.start, kept.start),
-                                    end=max(pred.end, kept.end),
-                                    score=kept.score,
-                                    analysis_explanation=kept.analysis_explanation,
-                                    recognition_metadata=kept.recognition_metadata,
-                                )
-                            break
+                if pred.entity_type == kept.entity_type and is_overlapping(
+                    pred.start, pred.end, kept
+                ):
+                    is_duplicate = True
+                    start = min(pred.start, kept.start)
+                    end = max(pred.end, kept.end)
+                    # Skip the widening if it would make the kept span a
+                    # duplicate of another kept result of the same type
+                    collides = any(
+                        j != i
+                        and other.entity_type == kept.entity_type
+                        and is_overlapping(start, end, other)
+                        for j, other in enumerate(unique)
+                    )
+                    if (start, end) != (kept.start, kept.end) and not collides:
+                        unique[i] = RecognizerResult(
+                            entity_type=kept.entity_type,
+                            start=start,
+                            end=end,
+                            score=kept.score,
+                            analysis_explanation=kept.analysis_explanation,
+                            recognition_metadata=kept.recognition_metadata,
+                        )
+                    break
 
             if not is_duplicate:
                 unique.append(pred)

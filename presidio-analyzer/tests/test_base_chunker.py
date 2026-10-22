@@ -93,6 +93,22 @@ class TestDeduplicateOverlappingEntities:
         assert text[result[0].start : result[0].end] == "John Smith"
         assert result[0].score == 0.92
 
+    def test_widening_skipped_when_it_would_overlap_another_kept_result(self):
+        """A widened span must not end up overlapping another kept result."""
+        chunker = CharacterBasedTextChunker()
+        predictions = [
+            RecognizerResult(entity_type="PERSON", start=8, end=10, score=0.75),
+            RecognizerResult(entity_type="PERSON", start=11, end=19, score=0.52),
+            RecognizerResult(entity_type="PERSON", start=3, end=16, score=0.15),
+        ]
+
+        result = chunker.deduplicate_overlapping_entities(predictions)
+
+        assert [(r.start, r.end, r.score) for r in result] == [
+            (8, 10, 0.75),
+            (11, 19, 0.52),
+        ]
+
     def test_different_types_not_deduplicated(self):
         """Overlapping entities of different types are kept."""
         chunker = CharacterBasedTextChunker()
