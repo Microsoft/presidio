@@ -100,6 +100,28 @@ def test_given_multiword_entity_then_map_analyzer_returns_correct_bboxes_and_len
     assert expected_result == mapped_entities
 
 
+def test_given_word_straddles_entity_start_then_map_analyzer_returns_bbox_for_word():
+    # OCR often glues a label to the first word of the value, e.g. "Name:John"
+    ocr_result = {
+        "text": ["Name:John", "Smith", "visited"],
+        "left": [10, 120, 190],
+        "top": [10, 10, 10],
+        "width": [100, 60, 70],
+        "height": [20, 20, 20],
+    }
+    text = "Name:John Smith visited"
+    recognizer_result = [RecognizerResult("PERSON", 5, 15, 0.85)]
+    expected_result = [
+        ImageRecognizerResult("PERSON", 5, 15, 0.85, 10, 10, 100, 20),
+        ImageRecognizerResult("PERSON", 5, 15, 0.85, 120, 10, 60, 20),
+    ]
+    mapped_entities = ImageAnalyzerEngine.map_analyzer_results_to_bounding_boxes(
+        recognizer_result, ocr_result, text, []
+    )
+
+    assert expected_result == mapped_entities
+
+
 def test_given_dif_len_entities_then_map_analyzer_returns_correct_outputand_len(
     get_ocr_analyzer_results, get_image_recognizerresult
 ):
