@@ -335,6 +335,20 @@ recognizers:
     enabled: false
     country_code: fi
 
+  - name: JpMyNumberRecognizer
+    supported_languages: 
+    - ja
+    type: predefined
+    enabled: false
+    country_code: jp
+
+  - name: JpCorporateNumberRecognizer
+    supported_languages: 
+    - ja
+    type: predefined
+    enabled: false
+    country_code: jp
+
   - name: KrBrnRecognizer
     supported_languages: 
     - ko
