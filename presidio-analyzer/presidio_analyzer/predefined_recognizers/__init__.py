@@ -152,6 +152,11 @@ from .country_specific.uk.uk_vehicle_registration_recognizer import (
     UkVehicleRegistrationRecognizer,
 )
 
+# United Arab Emirates recognizers
+from .country_specific.united_arab_emirates.ae_emirates_id_recognizer import (
+    AeEmiratesIdRecognizer,
+)
+
 # US recognizers
 from .country_specific.us.aba_routing_recognizer import AbaRoutingRecognizer
 from .country_specific.us.medical_license_recognizer import MedicalLicenseRecognizer
@@ -286,6 +291,7 @@ __all__ = [
     "UkPassportRecognizer",
     "UkPostcodeRecognizer",
     "UkVehicleRegistrationRecognizer",
+    "AeEmiratesIdRecognizer",
     "AzureHealthDeidRecognizer",
     "KrBrnRecognizer",
     "KrRrnRecognizer",

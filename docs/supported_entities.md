@@ -172,6 +172,12 @@ For more information, refer to the [adding new recognizers documentation](analyz
 | TR_NATIONAL_ID    | The Turkish National Identification Number (TCKN) is a unique 11-digit number issued to all Turkish citizens. | Pattern match, context and checksum. |
 | TR_LICENSE_PLATE  | Turkish vehicle license plate (plaka): 2-digit province code (01–81), 1–3 letters (A–Z, excluding Q, W, X), and 2–4 digits. Standard civilian format only. Legal basis: KTK Madde 23. | Pattern match, context and province code validation. |
 
+### United Arab Emirates
+
+| FieldType  | Description                                                                                             | Detection Method                         |
+|------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
+| AE_EMIRATES_ID    | The United Arab Emirates Emirates ID number is a unique 15-digit identifier issued by the Federal Authority for Identity, Citizenship, Customs and Port Security (ICP). It starts with 784, the UAE country code, followed by a four-digit year part, a seven-digit serial number and one verification digit. | Pattern match, context and sanity checks. |
+
 ### Philippines
 
 | FieldType  | Description                                                                                             | Detection Method                         |
