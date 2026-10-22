@@ -53,6 +53,8 @@ class BatchAnonymizerEngine:
 
         :param analyzer_results: Iterator of `DictRecognizerResult`
         containing the output of the AnalyzerEngine.analyze_dict on the input text.
+        An int, float or bool value with results is anonymized as its string
+        form, like a list item; one without results is returned unchanged.
         :param kwargs: Additional kwargs for the `AnonymizerEngine.anonymize` method
         """
 
@@ -64,9 +66,11 @@ class BatchAnonymizerEngine:
                 )
                 return_dict[result.key] = resp
 
-            elif isinstance(result.value, str):
+            elif isinstance(result.value, str) or (
+                type(result.value) in (bool, int, float) and result.recognizer_results
+            ):
                 resp = self.anonymizer_engine.anonymize(
-                    text=result.value,
+                    text=str(result.value),
                     analyzer_results=result.recognizer_results,
                     **kwargs,
                 )
