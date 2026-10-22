@@ -126,6 +126,81 @@ def test_anonymize_dict_with_other_value(engine):
     assert anonymize_results == {"id": 123}
 
 
+@pytest.mark.parametrize(
+    "value, result, expected",
+    [
+        (
+            4111111111111111,
+            RecognizerResult("CREDIT_CARD", 0, 16, 1.0),
+            "<CREDIT_CARD>",
+        ),
+        (
+            2125551234.0,
+            RecognizerResult("PHONE_NUMBER", 0, 10, 0.75),
+            "<PHONE_NUMBER>.0",
+        ),
+        (True, RecognizerResult("FLAG", 0, 4, 0.5), "<FLAG>"),
+        (0, RecognizerResult("ID", 0, 1, 0.5), "<ID>"),
+    ],
+)
+def test_when_scalar_dict_value_has_results_then_it_is_anonymized(
+    engine, value, result, expected
+):
+    analyzer_results = [
+        DictRecognizerResult(key="field", value=value, recognizer_results=[result])
+    ]
+    anonymize_results = engine.anonymize_dict(analyzer_results)
+    assert anonymize_results == {"field": expected}
+
+
+@pytest.mark.parametrize("value", [1.5, True, False, 0])
+def test_when_scalar_dict_value_has_no_results_then_its_type_is_kept(engine, value):
+    analyzer_results = [
+        DictRecognizerResult(key="field", value=value, recognizer_results=[])
+    ]
+    anonymize_results = engine.anonymize_dict(analyzer_results)
+    assert type(anonymize_results["field"]) is type(value)
+    assert anonymize_results["field"] == value
+
+
+def test_when_scalar_and_list_hold_same_card_then_both_are_anonymized(engine):
+    card = RecognizerResult("CREDIT_CARD", 0, 16, 1.0)
+    analyzer_results = [
+        DictRecognizerResult(
+            key="customer",
+            value={"card": 4111111111111111},
+            recognizer_results=[
+                DictRecognizerResult(
+                    key="card", value=4111111111111111, recognizer_results=[card]
+                )
+            ],
+        ),
+        DictRecognizerResult(
+            key="cards", value=[4111111111111111], recognizer_results=[[card]]
+        ),
+    ]
+    anonymize_results = engine.anonymize_dict(analyzer_results)
+    assert anonymize_results == {
+        "customer": {"card": "<CREDIT_CARD>"},
+        "cards": ["<CREDIT_CARD>"],
+    }
+
+
+def test_when_scalar_dict_value_uses_custom_operator_then_it_gets_the_digits(engine):
+    analyzer_results = [
+        DictRecognizerResult(
+            key="card",
+            value=4111111111111111,
+            recognizer_results=[RecognizerResult("CREDIT_CARD", 12, 16, 1.0)],
+        )
+    ]
+    anonymize_results = engine.anonymize_dict(
+        analyzer_results,
+        operators={"DEFAULT": OperatorConfig("custom", {"lambda": lambda x: f"*{x}"})},
+    )
+    assert anonymize_results == {"card": "411111111111*1111"}
+
+
 def test_given_custom_anonymizer_we_anonymize_dict_correctly(engine, analyzer_results):
     anonymizer_config = OperatorConfig("custom", {"lambda": lambda x: f"<ENTITY: {x}>"})
     anonymize_results = engine.anonymize_dict(
