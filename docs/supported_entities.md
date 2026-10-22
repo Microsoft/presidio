@@ -111,6 +111,12 @@ For more information, refer to the [adding new recognizers documentation](analyz
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
 | FI_PERSONAL_IDENTITY_CODE     | The Finnish Personal Identity Code (Henkilötunnus) is a unique 11 character individual identity number. | Pattern match, context and custom logic. |
 
+### Japan
+| FieldType  | Description                                                                                             | Detection Method                         |
+|------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|
+| JP_MY_NUMBER | The Japanese Individual Number (My Number / 個人番号) is a unique 12-digit number assigned to all residents in Japan for social security, taxation, and disaster response. | Pattern match, context and checksum |
+| JP_CORPORATE_NUMBER | The Japanese Corporate Number (法人番号) is a unique 13-digit identifier assigned by the National Tax Agency (国税庁) to registered corporations and government organizations in Japan. | Pattern match, context and checksum |
+
 ### Korea
 | FieldType  | Description                                                                                             | Detection Method                         |
 |------------|---------------------------------------------------------------------------------------------------------|------------------------------------------|

@@ -61,6 +61,12 @@ from .country_specific.italy.it_identity_card_recognizer import ItIdentityCardRe
 from .country_specific.italy.it_passport_recognizer import ItPassportRecognizer
 from .country_specific.italy.it_vat_code import ItVatCodeRecognizer
 
+# Japan recognizers
+from .country_specific.japan.jp_corporate_number_recognizer import (
+    JpCorporateNumberRecognizer,
+)
+from .country_specific.japan.jp_my_number_recognizer import JpMyNumberRecognizer
+
 # Korea recognizers
 from .country_specific.korea.kr_brn_recognizer import KrBrnRecognizer
 from .country_specific.korea.kr_driver_license_recognizer import (
@@ -265,6 +271,8 @@ __all__ = [
     "ItVatCodeRecognizer",
     "ItIdentityCardRecognizer",
     "ItPassportRecognizer",
+    "JpMyNumberRecognizer",
+    "JpCorporateNumberRecognizer",
     "InPanRecognizer",
     "GLiNERRecognizer",
     "HuggingFaceNerRecognizer",
