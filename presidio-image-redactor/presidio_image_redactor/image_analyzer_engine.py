@@ -162,11 +162,15 @@ class ImageAnalyzerEngine:
                 pos += 1
             else:
                 for element in text_analyzer_results:
-                    text_element = text[element.start : element.end]
-                    # check position and text of ocr word matches recognized entity
-                    if (
-                        max(pos, element.start) < min(element.end, pos + len(word))
-                    ) and ((text_element in word) or (word in text_element)):
+                    overlap_start = max(pos, element.start)
+                    overlap_end = min(element.end, pos + len(word))
+                    # check position of ocr word overlaps recognized entity and
+                    # the overlapping text is in the word. Compare only the
+                    # overlap: a word can straddle the entity start, e.g.
+                    # "Name:John" for the entity "John Smith".
+                    if (overlap_start < overlap_end) and (
+                        text[overlap_start:overlap_end] in word
+                    ):
                         yes_make_bbox_for_word = (
                             (word is not None)
                             and (word != "")
