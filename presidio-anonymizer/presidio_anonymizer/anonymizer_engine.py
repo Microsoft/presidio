@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Set, Tuple, Type
 
 from presidio_anonymizer.core import EngineBase
 from presidio_anonymizer.entities import (
@@ -143,51 +143,12 @@ class AnonymizerEngine(EngineBase):
         2. Have the same indices as other results but with larger score.
         :return: List
         """
-        tmp_analyzer_results = []
-        # This list contains all elements which we need to check a single result
-        # against. If a result is dropped, it can also be dropped from this list
-        # since it is intersecting with another result and we selected the other one.
-        other_elements = analyzer_results.copy()
-        for result in analyzer_results:
-            other_elements.remove(result)
-
-            is_merge_same_entity_type = False
-            for other_element in other_elements:
-                if other_element.entity_type != result.entity_type:
-                    continue
-                if result.intersects(other_element) == 0:
-                    continue
-
-                other_element.start = min(result.start, other_element.start)
-                other_element.end = max(result.end, other_element.end)
-                other_element.score = max(result.score, other_element.score)
-                is_merge_same_entity_type = True
-                break
-            if not is_merge_same_entity_type:
-                other_elements.append(result)
-                tmp_analyzer_results.append(result)
-            else:
-                self.logger.debug(
-                    f"removing element {result} from " f"results list due to merge"
-                )
-
-        unique_text_metadata_elements = []
-        # This list contains all elements which we need to check a single result
-        # against. If a result is dropped, it can also be dropped from this list
-        # since it is intersecting with another result and we selected the other one.
-        other_elements = tmp_analyzer_results.copy()
-        for result in tmp_analyzer_results:
-            other_elements.remove(result)
-            result_conflicted = self.__is_result_conflicted_with_other_elements(
-                other_elements, result
-            )
-            if not result_conflicted:
-                other_elements.append(result)
-                unique_text_metadata_elements.append(result)
-            else:
-                self.logger.debug(
-                    f"removing element {result} from results list due to conflict"
-                )
+        tmp_analyzer_results = self._merge_same_entity_type_intersections(
+            analyzer_results
+        )
+        unique_text_metadata_elements = self._remove_contained_results(
+            tmp_analyzer_results
+        )
 
         # This further improves the quality of handling the conflict between the
         # various entities overlapping. This will not drop the results insted
@@ -221,6 +182,94 @@ class AnonymizerEngine(EngineBase):
             ]
         return unique_text_metadata_elements
 
+    def _merge_same_entity_type_intersections(
+        self, analyzer_results: List[RecognizerResult]
+    ) -> List[RecognizerResult]:
+        """
+        Merge intersecting results of the same entity type into one result.
+
+        One sorted sweep per entity type replaces the pairwise scan, which was
+        quadratic in the number of results. A merged result keeps the union of
+        the spans and the highest score, and takes the position of the last
+        input it absorbed, so the order of the remaining results is unchanged.
+        """
+        by_entity_type: Dict[str, List[Tuple[int, RecognizerResult]]] = {}
+        for position, result in enumerate(analyzer_results):
+            by_entity_type.setdefault(result.entity_type, []).append((position, result))
+
+        kept: List[Tuple[int, RecognizerResult]] = []
+        for positioned_results in by_entity_type.values():
+            positioned_results.sort(key=lambda item: (item[1].start, item[1].end))
+            position, current = positioned_results[0]
+            for next_position, result in positioned_results[1:]:
+                if current.intersects(result) == 0:
+                    kept.append((position, current))
+                    position, current = next_position, result
+                    continue
+                self.logger.debug(
+                    f"removing element {result} from results list due to merge"
+                )
+                current.start = min(current.start, result.start)
+                current.end = max(current.end, result.end)
+                current.score = max(current.score, result.score)
+                position = max(position, next_position)
+            kept.append((position, current))
+
+        kept.sort(key=lambda item: item[0])
+        return [result for _, result in kept]
+
+    def _remove_contained_results(
+        self, analyzer_results: List[RecognizerResult]
+    ) -> List[RecognizerResult]:
+        """
+        Drop every result that has a conflict with another result.
+
+        A result contained in another result is dropped. Of results with equal
+        indices the highest score survives, the last one on a tie, which is what
+        the pairwise comparison with has_conflict produced. Sorted by start and
+        then by the longer span first, every result that can contain the current
+        one has already been seen, so the largest end seen so far decides.
+        """
+        order = sorted(
+            range(len(analyzer_results)),
+            key=lambda index: (
+                analyzer_results[index].start,
+                -analyzer_results[index].end,
+            ),
+        )
+        dropped: Set[int] = set()
+        largest_end_seen: Optional[int] = None
+        group_start = 0
+        while group_start < len(order):
+            first = analyzer_results[order[group_start]]
+            group_end = group_start
+            while group_end < len(order) and analyzer_results[
+                order[group_end]
+            ].equal_indices(first):
+                group_end += 1
+            group = order[group_start:group_end]
+            if largest_end_seen is not None and largest_end_seen >= first.end:
+                dropped.update(group)
+            else:
+                survivor = max(
+                    group, key=lambda index: (analyzer_results[index].score, index)
+                )
+                dropped.update(index for index in group if index != survivor)
+            if largest_end_seen is None or first.end > largest_end_seen:
+                largest_end_seen = first.end
+            group_start = group_end
+
+        for index in sorted(dropped):
+            self.logger.debug(
+                f"removing element {analyzer_results[index]} "
+                f"from results list due to conflict"
+            )
+        return [
+            result
+            for index, result in enumerate(analyzer_results)
+            if index not in dropped
+        ]
+
     def _merge_entities_with_spaces_between(
         self, text: str, analyzer_results: List[RecognizerResult]
     ) -> List[RecognizerResult]:
@@ -241,12 +290,6 @@ class AnonymizerEngine(EngineBase):
         """Return a list of supported anonymizers."""
         names = [p for p in self.operators_factory.get_anonymizers().keys()]
         return names
-
-    @staticmethod
-    def __is_result_conflicted_with_other_elements(other_elements, result):
-        return any(
-            [result.has_conflict(other_element) for other_element in other_elements]
-        )
 
     @staticmethod
     def __check_or_add_default_operator(
