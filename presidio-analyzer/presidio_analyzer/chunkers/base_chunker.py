@@ -1,10 +1,9 @@
 """Abstract base class for text chunking strategies."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, List
+from typing import Callable, List, Optional, Tuple
 
-if TYPE_CHECKING:
-    from presidio_analyzer import RecognizerResult
+from presidio_analyzer.recognizer_result import RecognizerResult
 
 
 @dataclass
@@ -61,8 +60,12 @@ class BaseTextChunker(ABC):
         if len(chunks) == 1:
             return predict_func(text)
 
-        predictions = self._process_chunks(chunks, predict_func)
-        return self.deduplicate_overlapping_entities(predictions)
+        predictions, at_chunk_edge = self._process_chunks_marking_edges(
+            chunks, predict_func
+        )
+        return self.deduplicate_overlapping_entities(
+            predictions, at_chunk_edge=at_chunk_edge
+        )
 
     def _process_chunks(
         self,
@@ -76,11 +79,32 @@ class BaseTextChunker(ABC):
             RecognizerResult objects
         :return: List of RecognizerResult with adjusted offsets
         """
-        from presidio_analyzer import RecognizerResult
+        predictions, _ = self._process_chunks_marking_edges(chunks, process_func)
+        return predictions
 
+    def _process_chunks_marking_edges(
+        self,
+        chunks: List[TextChunk],
+        process_func: Callable[[str], List["RecognizerResult"]],
+    ) -> Tuple[List["RecognizerResult"], List[bool]]:
+        """Process text chunks and mark predictions cut by an inner chunk edge.
+
+        A prediction touches an inner edge when it starts at the start of any
+        chunk but the first, or ends at the end of any chunk but the last.
+        Such a prediction may be a partial entity that the neighbouring
+        chunk saw whole.
+
+        :param chunks: List of TextChunk objects with text and position information
+        :param process_func: Function that takes chunk text and returns
+            RecognizerResult objects
+        :return: Tuple of the RecognizerResult list with adjusted offsets and
+            a parallel list of inner-edge flags
+        """
         all_predictions = []
+        at_chunk_edge = []
+        last = len(chunks) - 1
 
-        for chunk in chunks:
+        for idx, chunk in enumerate(chunks):
             chunk_predictions = process_func(chunk.text)
 
             # Create new RecognizerResult objects with adjusted offsets
@@ -95,81 +119,81 @@ class BaseTextChunker(ABC):
                     recognition_metadata=pred.recognition_metadata,
                 )
                 all_predictions.append(adjusted_pred)
+                at_chunk_edge.append(
+                    (idx > 0 and pred.start == 0)
+                    or (idx < last and pred.end == len(chunk.text))
+                )
 
-        return all_predictions
+        return all_predictions, at_chunk_edge
 
     def deduplicate_overlapping_entities(
         self,
         predictions: List["RecognizerResult"],
         overlap_threshold: float = 0.5,
+        at_chunk_edge: Optional[List[bool]] = None,
     ) -> List["RecognizerResult"]:
         """Remove duplicate entities from overlapping chunks.
 
-        The highest-scoring prediction is kept, widened to cover the spans of
-        the duplicates it absorbs, so an entity that one chunk saw only
-        partially is not cut back to the partial span.
+        The highest-scoring prediction is kept, unless it touches an inner
+        chunk edge and its only duplicate does not. The overlap guarantees the
+        neighbouring chunk saw that entity whole, so its prediction is kept
+        instead of the possibly partial one.
 
         :param predictions: List of RecognizerResult objects
         :param overlap_threshold: Overlap ratio threshold to consider duplicates
             (default: 0.5)
+        :param at_chunk_edge: Optional list, parallel to predictions, flagging
+            predictions that touch an inner chunk edge (default: none do)
         :return: Deduplicated list of RecognizerResult sorted by position
         """
-        from presidio_analyzer import RecognizerResult
-
         if not predictions:
             return predictions
+        if at_chunk_edge is None:
+            at_chunk_edge = [False] * len(predictions)
 
-        def is_overlapping(start: int, end: int, other: "RecognizerResult") -> bool:
-            overlap_start = max(start, other.start)
-            overlap_end = min(end, other.end)
+        def is_duplicate(pred: "RecognizerResult", kept: "RecognizerResult") -> bool:
+            # Check if same entity type and overlapping positions
+            if pred.entity_type != kept.entity_type:
+                return False
+            overlap_start = max(pred.start, kept.start)
+            overlap_end = min(pred.end, kept.end)
             if overlap_start >= overlap_end:
                 return False
 
             # Calculate overlap ratio
             overlap_len = overlap_end - overlap_start
-            span_len = end - start
-            other_len = other.end - other.start
-            if span_len <= 0 or other_len <= 0:
+            pred_len = pred.end - pred.start
+            kept_len = kept.end - kept.start
+            if pred_len <= 0 or kept_len <= 0:
                 return False
 
             # Check if overlap exceeds threshold
-            return overlap_len / min(span_len, other_len) > overlap_threshold
+            return overlap_len / min(pred_len, kept_len) > overlap_threshold
 
         # Sort by score descending to keep highest scoring entities
-        sorted_preds = sorted(predictions, key=lambda p: p.score, reverse=True)
+        order = sorted(
+            range(len(predictions)), key=lambda i: predictions[i].score, reverse=True
+        )
         unique = []
+        unique_at_edge = []
 
-        for pred in sorted_preds:
-            is_duplicate = False
-            for i, kept in enumerate(unique):
-                # Check if same entity type and overlapping positions
-                if pred.entity_type == kept.entity_type and is_overlapping(
-                    pred.start, pred.end, kept
-                ):
-                    is_duplicate = True
-                    start = min(pred.start, kept.start)
-                    end = max(pred.end, kept.end)
-                    # Skip the widening if it would make the kept span a
-                    # duplicate of another kept result of the same type
-                    collides = any(
-                        j != i
-                        and other.entity_type == kept.entity_type
-                        and is_overlapping(start, end, other)
-                        for j, other in enumerate(unique)
-                    )
-                    if (start, end) != (kept.start, kept.end) and not collides:
-                        unique[i] = RecognizerResult(
-                            entity_type=kept.entity_type,
-                            start=start,
-                            end=end,
-                            score=kept.score,
-                            analysis_explanation=kept.analysis_explanation,
-                            recognition_metadata=kept.recognition_metadata,
-                        )
-                    break
-
-            if not is_duplicate:
+        for idx in order:
+            pred = predictions[idx]
+            duplicates = [
+                i for i, kept in enumerate(unique) if is_duplicate(pred, kept)
+            ]
+            if not duplicates:
                 unique.append(pred)
+                unique_at_edge.append(at_chunk_edge[idx])
+            elif (
+                len(duplicates) == 1
+                and unique_at_edge[duplicates[0]]
+                and not at_chunk_edge[idx]
+            ):
+                # The kept result may be cut by a chunk edge, prefer the
+                # prediction from the chunk that saw the entity whole
+                unique[duplicates[0]] = pred
+                unique_at_edge[duplicates[0]] = False
 
         # Sort by position for consistent output
         return sorted(unique, key=lambda p: p.start)
