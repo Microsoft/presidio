@@ -1,12 +1,23 @@
 import copy
 import logging
-from typing import List, Optional
+import re
+from functools import lru_cache
+from typing import Iterator, List, Optional, Tuple
 
 from presidio_analyzer import EntityRecognizer, RecognizerResult
 from presidio_analyzer.context_aware_enhancers import ContextAwareEnhancer
 from presidio_analyzer.nlp_engine import NlpArtifacts
 
 logger = logging.getLogger("presidio-analyzer")
+
+
+@lru_cache(maxsize=1024)
+def _compile_phrase(phrase: str, whole_word: bool) -> re.Pattern:
+    """Compile a context phrase: its words in order, any whitespace between."""
+    pattern = r"\s+".join(re.escape(part) for part in phrase.split())
+    if whole_word:
+        pattern = rf"(?<!\w){pattern}(?!\w)"
+    return re.compile(pattern, re.IGNORECASE)
 
 
 class LemmaContextAwareEnhancer(ContextAwareEnhancer):
@@ -18,6 +29,9 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
     it compares spacy lemmas of each word in context of the matched entity to given
     context and the recognizer context words,
     if matched it enhance the recognized entity confidence score by a given factor.
+    A context word that contains whitespace (e.g. 'driving licence') cannot equal
+    a single lemma, so when no context word matches, such phrases are also looked
+    up in the original text of the context window, outside the entity itself.
 
     :param context_similarity_factor: How much to enhance confidence of match entity
     :param min_score_with_context_similarity: Minimum confidence score
@@ -30,6 +44,8 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         - "whole_word": Match context words only as whole words
           (e.g., 'lic' matches 'lic' but not 'duplicate').
           Prevents false positives.
+        A phrase matches its words in order, separated by any whitespace,
+        case-insensitively; "whole_word" also requires word boundaries around it.
     """
 
     def __init__(
@@ -147,6 +163,22 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
             supportive_context_word = self._find_supportive_word_in_context(
                 surrounding_words, recognizer.context, self.context_matching_mode
             )
+            if supportive_context_word == "" and any(
+                len(context_word.split()) > 1 for context_word in recognizer.context
+            ):
+                window = self._get_context_window_span(
+                    nlp_artifacts=nlp_artifacts, word=word, start=result.start
+                )
+                if window:
+                    supportive_context_word = self._find_supportive_phrase_in_text(
+                        text=text,
+                        window_start=window[0],
+                        window_end=window[1],
+                        entity_start=result.start,
+                        entity_end=result.end,
+                        recognizer_context_list=recognizer.context,
+                        matching_mode=self.context_matching_mode,
+                    )
             if supportive_context_word != "":
                 result.score += self.context_similarity_factor
                 result.score = max(result.score, self.min_score_with_context_similarity)
@@ -218,6 +250,93 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
                 break
 
         return word
+
+    @staticmethod
+    def _find_supportive_phrase_in_text(
+        text: str,
+        window_start: int,
+        window_end: int,
+        entity_start: int,
+        entity_end: int,
+        recognizer_context_list: List[str],
+        matching_mode: str = "substring",
+    ) -> str:
+        """
+        Find a context word that contains whitespace in the context window text.
+
+        Such a phrase never equals a single lemma, so it is matched against the
+        original text of the window instead. A match that overlaps the entity
+        itself does not count.
+
+        :param text: the analyzed text
+        :param window_start: start offset of the context window in the text
+        :param window_end: end offset of the context window in the text
+        :param entity_start: start offset of the recognized entity
+        :param entity_end: end offset of the recognized entity
+        :param recognizer_context_list: the recognizer's context words
+        :param matching_mode: Matching mode ('whole_word' or 'substring').
+        :return: the first matching phrase, or an empty string
+        """
+        for predefined_context_word in recognizer_context_list or []:
+            if len(predefined_context_word.split()) < 2:
+                continue
+            pattern = _compile_phrase(
+                predefined_context_word, matching_mode == "whole_word"
+            )
+            # One character past the window lets a word boundary see the next
+            # character; a match ending there is outside the window. Search again
+            # one character on, as a rejected match can overlap a valid one.
+            end_pos = window_end + 1
+            match = pattern.search(text, window_start, end_pos)
+            while match:
+                if match.end() <= window_end and (
+                    match.end() <= entity_start or match.start() >= entity_end
+                ):
+                    logger.debug("Found context phrase '%s'", predefined_context_word)
+                    return predefined_context_word
+                match = pattern.search(text, match.start() + 1, end_pos)
+        return ""
+
+    def _get_context_window_span(
+        self, nlp_artifacts: NlpArtifacts, word: str, start: int
+    ) -> Optional[Tuple[int, int]]:
+        """Return the start and end offsets of the text the context window covers.
+
+        The window is the tokens that `_extract_surrounding_words` takes its
+        context lemmas from.
+
+        :param nlp_artifacts: the NLP artifacts of the analyzed text
+        :param word: the recognized entity text
+        :param start: the start index of the entity in the original text
+        """
+        if not nlp_artifacts.tokens:
+            return None
+
+        tokens = nlp_artifacts.tokens
+        tokens_indices = nlp_artifacts.tokens_indices
+        token_index = self._find_index_of_match_token(
+            word, start, tokens, tokens_indices
+        )
+        visited = [
+            *self._walk_context_tokens(
+                token_index,
+                self.context_prefix_count,
+                nlp_artifacts.lemmas,
+                nlp_artifacts.keywords,
+                is_backward=True,
+            ),
+            *self._walk_context_tokens(
+                token_index,
+                self.context_suffix_count,
+                nlp_artifacts.lemmas,
+                nlp_artifacts.keywords,
+                is_backward=False,
+            ),
+        ]
+        if not visited:
+            return None
+        first, last = min(visited), max(visited)
+        return tokens_indices[first], tokens_indices[last] + len(tokens[last])
 
     def _extract_surrounding_words(
         self, nlp_artifacts: NlpArtifacts, word: str, start: int
@@ -330,22 +449,46 @@ class LemmaContextAwareEnhancer(ContextAwareEnhancer):
         :param is_backward: if true take the preceeding words, if false,
                             take the successing words
         """
-        i = index
         context_words = []
+        for i in LemmaContextAwareEnhancer._walk_context_tokens(
+            index, n_words, lemmas, lemmatized_filtered_keywords, is_backward
+        ):
+            lower_lemma = lemmas[i].lower()
+            if lower_lemma in lemmatized_filtered_keywords:
+                context_words.append(lower_lemma)
+        return context_words
+
+    @staticmethod
+    def _walk_context_tokens(
+        index: int,
+        n_words: int,
+        lemmas: List[str],
+        lemmatized_filtered_keywords: List[str],
+        is_backward: bool,
+    ) -> Iterator[int]:
+        """Yield the token indices of the context window, starting at index.
+
+        :param index: index of the lemma that its surrounding words we want
+        :param n_words: number of keywords to take
+        :param lemmas: array of lemmas
+        :param lemmatized_filtered_keywords: the array of filtered
+               lemmas from the original sentence,
+        :param is_backward: if true walk to the preceeding words, if false,
+                            to the successing words
+        """
+        i = index
         # The entity itself is no interest to us...however we want to
         # consider it anyway for cases were it is attached with no spaces
         # to an interesting context word, so we allow it and add 1 to
         # the number of collected words
 
-        # collect at most n words (in lower case)
+        # visit tokens until n keywords (in lower case) were collected
         remaining = n_words + 1
         while 0 <= i < len(lemmas) and remaining > 0:
-            lower_lemma = lemmas[i].lower()
-            if lower_lemma in lemmatized_filtered_keywords:
-                context_words.append(lower_lemma)
+            yield i
+            if lemmas[i].lower() in lemmatized_filtered_keywords:
                 remaining -= 1
             i = i - 1 if is_backward else i + 1
-        return context_words
 
     def _add_n_words_forward(
         self,

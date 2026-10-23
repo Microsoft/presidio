@@ -2,7 +2,7 @@
 
 Presidio has an internal mechanism for leveraging context words. This mechanism would increase the detection confidence of a PII entity in case a specific word appears before or after it.
 
-Furthermore, it is possible to create your own context enhancer, if you require a different logic for identifying context terms. The default context-aware enhancer in Presidio is the `LemmaContextAwareEnhancer` which compares each recognizer's context terms with the lemma of each token in the sentence.
+Furthermore, it is possible to create your own context enhancer, if you require a different logic for identifying context terms. The default context-aware enhancer in Presidio is the `LemmaContextAwareEnhancer` which compares each recognizer's context terms with the lemma of each token in the sentence. A context term that contains a space, such as `zip code`, cannot equal the lemma of one token, so when no context term matches a lemma, the enhancer also looks for such terms in the original text of the context window, outside the entity itself.
 
 In this example we would first implement a zip code recognizer without context, and then add context to see how the confidence changes. Zip regex patterns (essentially 5 digits) are very weak, so we would want the initial confidence to be low, and increased with the existence of context words.
 
