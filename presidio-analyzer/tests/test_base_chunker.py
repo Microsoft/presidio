@@ -68,6 +68,85 @@ class TestDeduplicateOverlappingEntities:
 
         assert len(result) == 1
 
+    def test_duplicate_prefers_prediction_not_cut_by_chunk_edge(self):
+        """A partial match at a chunk edge must not hide the full entity."""
+        chunker = CharacterBasedTextChunker(chunk_size=38, chunk_overlap=10)
+        text = "The contact person for this case is John Smith from accounting."
+
+        def predict_func(chunk):
+            # The first chunk ends after "John", so it only sees the first name
+            if chunk.endswith("John"):
+                idx = chunk.index("John")
+                return [
+                    RecognizerResult(
+                        entity_type="PERSON", start=idx, end=idx + 4, score=0.92
+                    )
+                ]
+            if "John Smith" in chunk:
+                idx = chunk.index("John Smith")
+                return [
+                    RecognizerResult(
+                        entity_type="PERSON", start=idx, end=idx + 10, score=0.88
+                    )
+                ]
+            return []
+
+        result = chunker.predict_with_chunking(text, predict_func)
+
+        assert len(result) == 1
+        assert text[result[0].start : result[0].end] == "John Smith"
+        assert result[0].score == 0.88
+
+    def test_lower_score_containing_span_does_not_replace_kept(self):
+        """A low-score span containing the kept one must not take its place."""
+        chunker = CharacterBasedTextChunker()
+        text = "John Smith met Jane Doe"
+        predictions = [
+            RecognizerResult(entity_type="PERSON", start=0, end=10, score=0.95),
+            RecognizerResult(entity_type="PERSON", start=0, end=23, score=0.3),
+        ]
+
+        result = chunker.deduplicate_overlapping_entities(predictions)
+
+        assert [(text[r.start : r.end], r.score) for r in result] == [
+            ("John Smith", 0.95)
+        ]
+
+    def test_span_covering_two_kept_results_is_dropped(self):
+        """A low-score span covering two kept results must not overlap them."""
+        chunker = CharacterBasedTextChunker()
+        text = "Paris, London"
+        predictions = [
+            RecognizerResult(entity_type="LOCATION", start=0, end=5, score=0.9),
+            RecognizerResult(entity_type="LOCATION", start=7, end=13, score=0.85),
+            RecognizerResult(entity_type="LOCATION", start=0, end=13, score=0.4),
+        ]
+
+        result = chunker.deduplicate_overlapping_entities(predictions)
+
+        assert [(text[r.start : r.end], r.score) for r in result] == [
+            ("Paris", 0.9),
+            ("London", 0.85),
+        ]
+
+    def test_edge_result_not_replaced_when_other_duplicates_exist(self):
+        """A replacement that duplicates two kept results is dropped instead."""
+        chunker = CharacterBasedTextChunker()
+        predictions = [
+            RecognizerResult(entity_type="PERSON", start=8, end=10, score=0.75),
+            RecognizerResult(entity_type="PERSON", start=11, end=19, score=0.52),
+            RecognizerResult(entity_type="PERSON", start=3, end=16, score=0.15),
+        ]
+
+        result = chunker.deduplicate_overlapping_entities(
+            predictions, at_chunk_edge=[True, False, False]
+        )
+
+        assert [(r.start, r.end, r.score) for r in result] == [
+            (8, 10, 0.75),
+            (11, 19, 0.52),
+        ]
+
     def test_different_types_not_deduplicated(self):
         """Overlapping entities of different types are kept."""
         chunker = CharacterBasedTextChunker()
