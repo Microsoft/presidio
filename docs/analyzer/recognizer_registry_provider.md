@@ -138,3 +138,55 @@ The recognizer list comprises of both the predefined and custom recognizers, for
       supported_languages: ["ko"]
       enabled: false
     ```
+
+## Using a custom registry file with the Presidio Analyzer server
+
+The Presidio Analyzer server (the `presidio-analyzer` Docker image) selects
+its recognizer registry through the `RECOGNIZER_REGISTRY_CONF_FILE`
+environment variable. It defaults to the bundled
+`presidio_analyzer/conf/default_recognizers.yaml`; point it at your own YAML
+file (mounted into the container) to load a modified registry without
+rebuilding the image. The server reads `ANALYZER_CONF_FILE` and
+`NLP_CONF_FILE` the same way.
+
+!!! note "Note"
+
+    `supported_languages` in the registry file must match the same field in
+    the analyzer configuration file.
+
+### Example: enabling a pattern-based country recognizer for `en`
+
+Some predefined recognizers are only registered for their native language.
+`ItFiscalCodeRecognizer`, for example, is registered with
+`supported_languages: [it]` in `default_recognizers.yaml`, so the default
+image — which loads the `en` NLP model and `supported_languages: [en]` —
+cannot detect Italian fiscal codes. Because the recognizer is pattern-based,
+it does not depend on the Italian NLP model and can be enabled for `en` by
+overriding the registry file:
+
+1. Copy the default registry file and change the recognizer's
+`supported_languages` (leave `country_code` unchanged — it must match the
+class declaration and is only the country tag, not a language):
+
+    ```yaml
+    - name: ItFiscalCodeRecognizer
+      supported_languages:
+      - en
+      type: predefined
+      country_code: it
+    ```
+
+2. Run the analyzer with the file mounted and the environment variable set:
+
+    ```bash
+    docker run --rm -p 3000:3000 \
+      -v $(pwd)/my_recognizers.yaml:/app/my_recognizers.yaml \
+      -e RECOGNIZER_REGISTRY_CONF_FILE=/app/my_recognizers.yaml \
+      ghcr.io/data-privacy-stack/presidio-analyzer:<version>
+    ```
+
+Requests with `entities: ["IT_FISCAL_CODE"]` are now served for
+`language: en`.
+
+To restrict or extend which country-specific recognizers are loaded in
+general, see [Filtering recognizers by country](filtering_by_country.md).
