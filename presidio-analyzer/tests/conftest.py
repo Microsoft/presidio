@@ -12,7 +12,10 @@ from presidio_analyzer import (
 )
 from presidio_analyzer import RecognizerRegistry
 from presidio_analyzer.nlp_engine import NlpEngineProvider, NlpEngine
-from presidio_analyzer.predefined_recognizers import NLP_RECOGNIZERS, PREDEFINED_RECOGNIZERS
+from presidio_analyzer.predefined_recognizers import (
+    NLP_RECOGNIZERS,
+    PREDEFINED_RECOGNIZERS,
+)
 from tests.mocks import RecognizerRegistryMock, NlpEngineMock
 
 
@@ -79,6 +82,14 @@ def skip_by_engine(request, nlp_engines):
 @pytest.fixture(scope="session")
 def spacy_nlp_engine(nlp_engines):
     nlp_engine = nlp_engines.get("spacy_en", None)
+    if nlp_engine:
+        nlp_engine.load()
+    return nlp_engine
+
+
+@pytest.fixture(scope="session")
+def stanza_nlp_engine(nlp_engines):
+    nlp_engine = nlp_engines.get("stanza_en", None)
     if nlp_engine:
         nlp_engine.load()
     return nlp_engine

@@ -9,14 +9,6 @@ def entities():
 
 
 @pytest.fixture(scope="module")
-def stanza_nlp_engine(nlp_engines):
-    nlp_engine = nlp_engines.get("stanza_en", None)
-    if nlp_engine:
-        nlp_engine.load()
-    return nlp_engine
-
-
-@pytest.fixture(scope="module")
 def nlp_recognizer(nlp_recognizers):
     return nlp_recognizers.get("stanza", None)
 

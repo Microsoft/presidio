@@ -261,6 +261,57 @@ def create_tokenizer(
     return tokenizer_factory
 
 
+class MultiWordTokenSurface:
+    """Surface view over a Stanza multi-word token (mwt).
+
+    Stanza's mwt processor splits contractions such as the German "im"
+    into multiple words ("in" + "dem"). Flattening the expanded words into
+    the token list breaks the alignment with the original text (and with
+    it every character offset, dropping NER entities). This wrapper exposes
+    the unexpanded surface form as a single token instead: `text` and
+    `lemma` are the surface form, all other annotations are borrowed from
+    the first expanded word.
+    """
+
+    def __init__(self, token):
+        """Init with a Stanza token that has more than one word.
+
+        :param token: A stanza.models.common.doc.Token with more than one word.
+        """
+        self._token = token
+        self._first_word = token.words[0]
+
+    @property
+    def words(self):
+        """The words Stanza expanded this multi-word token into."""
+        return self._token.words
+
+    @property
+    def text(self):
+        """The surface form of the token, as it appears in the text."""
+        return self._token.text
+
+    @property
+    def lemma(self):
+        """The surface form is used as its own lemma.
+
+        A lemma taken from one of the expanded words (e.g. "in" for "im")
+        would not correspond to any span of the original text.
+        """
+        return self._token.text
+
+    def __getattr__(self, name):
+        """Delegate annotations not defined here to the first expanded word.
+
+        Only called for attributes not found through normal lookup,
+        e.g. upos, xpos, feats, head and deprel.
+        """
+        first_word = self.__dict__.get("_first_word")
+        if first_word is None:
+            raise AttributeError(name)
+        return getattr(first_word, name)
+
+
 # Code taken from https://github.com/explosion/spacy-stanza
 # Supports Stanza > 1.7.0
 class StanzaTokenizer(object):
@@ -422,6 +473,12 @@ class StanzaTokenizer(object):
 
         extract the token indices of the sentence start tokens to set is_sent_start.
 
+        Multi-word tokens (words expanded by Stanza's mwt processor,
+        e.g. the German contraction "im" into "in" + "dem") are kept as a
+        single surface token, so that the token texts remain aligned with
+        the original text and character offsets (e.g. of NER entities)
+        are preserved.
+
         snlp_doc (stanza.Document): The processed Stanza doc.
         RETURNS (list): The tokens (words).
         """
@@ -429,18 +486,40 @@ class StanzaTokenizer(object):
         heads = []
         offset = 0
         for sentence in snlp_doc.sentences:
+            # Stanza tokens, with multi-word tokens kept unexpanded
+            sentence_tokens = []
+            # Map each (expanded) word index within the sentence to the index
+            # of the emitted token covering it, so that dependency heads of
+            # words surrounding a multi-word token stay correct after it is
+            # collapsed into a single token.
+            word_index_to_token_index = {}
+            word_index = 0
             for token in sentence.tokens:
-                for word in token.words:
-                    # Here, we're calculating the absolute token index in the doc,
-                    # then the *relative* index of the head, -1 for zero-indexed
-                    # and if the governor is 0 (root), we leave it at 0
-                    if word.head:
-                        head = word.head + offset - len(tokens) - 1
-                    else:
-                        head = 0
-                    heads.append(head)
-                    tokens.append(word)
-            offset += sum(len(token.words) for token in sentence.tokens)
+                if not token.words:
+                    continue
+                token_index = len(sentence_tokens)
+                if len(token.words) > 1:
+                    sentence_tokens.append(MultiWordTokenSurface(token))
+                else:
+                    sentence_tokens.append(token.words[0])
+                for _ in range(len(token.words)):
+                    word_index_to_token_index[word_index] = token_index
+                    word_index += 1
+            for token_index, token in enumerate(sentence_tokens):
+                # Here, we're calculating the absolute token index in the doc,
+                # then the *relative* index of the head (the governor's word
+                # index is 1-based, 0 means root and is left at 0)
+                if token.head:
+                    head = (
+                        offset
+                        + word_index_to_token_index.get(token.head - 1, token_index)
+                        - len(tokens)
+                    )
+                else:
+                    head = 0
+                heads.append(head)
+                tokens.append(token)
+            offset += len(sentence_tokens)
         return tokens, heads
 
     @staticmethod

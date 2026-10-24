@@ -8,15 +8,6 @@ import pytest
 from presidio_analyzer.nlp_engine import NlpArtifacts
 
 
-@pytest.fixture(scope="module")
-def stanza_nlp_engine(nlp_engines):
-    """Get the StanzaNlpEngine from the available engines."""
-    nlp_engine = nlp_engines.get("stanza_en", None)
-    if nlp_engine:
-        nlp_engine.load()
-    return nlp_engine
-
-
 @pytest.mark.skip_engine("stanza_en")
 class TestStanzaBatchProcessing:
     """Test suite for Stanza batch processing functionality."""
